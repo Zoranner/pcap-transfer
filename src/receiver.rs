@@ -1,83 +1,17 @@
-use anyhow::{Context, Result};
 use chrono::Utc;
 use pcapfile_io::{DataPacket, PcapWriter, WriterConfig};
 use std::path::Path;
-use std::time::Instant;
 use tokio::signal;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use crate::cli::NetworkType;
-use crate::network::{create_udp_receiver, validate_network_config, ReceiverConfig};
-use crate::utils::{ensure_output_directory, format_bytes, format_rate, validate_port};
+use crate::config::{AppConfig, DisplayConfig, OperationConfig};
+use crate::display::Display;
+use crate::error::Result;
+use crate::network::UdpSocketFactory;
+use crate::stats::TransferStats;
 
-/// 接收器统计信息
-#[derive(Debug, Default)]
-struct ReceiverStats {
-    packets_received: usize,
-    bytes_received: u64,
-    errors: usize,
-    start_time: Option<Instant>,
-}
-
-impl ReceiverStats {
-    fn new() -> Self {
-        Self {
-            start_time: Some(Instant::now()),
-            ..Default::default()
-        }
-    }
-
-    fn update(&mut self, bytes: usize) {
-        self.packets_received += 1;
-        self.bytes_received += bytes as u64;
-    }
-
-    fn add_error(&mut self) {
-        self.errors += 1;
-    }
-
-    fn get_duration(&self) -> std::time::Duration {
-        self.start_time
-            .map(|start| start.elapsed())
-            .unwrap_or_default()
-    }
-
-    fn get_rate_bps(&self) -> f64 {
-        let duration_secs = self.get_duration().as_secs_f64();
-        if duration_secs > 0.0 {
-            (self.bytes_received as f64 * 8.0) / duration_secs
-        } else {
-            0.0
-        }
-    }
-
-    fn print_progress(&self) {
-        let rate_bps = self.get_rate_bps();
-        info!(
-            "已接收 {} 包, {} 字节, 速率: {}",
-            self.packets_received,
-            format_bytes(self.bytes_received),
-            format_rate(rate_bps)
-        );
-    }
-
-    fn print_summary(&self) {
-        let duration = self.get_duration();
-        let rate_bps = self.get_rate_bps();
-
-        info!("接收完成统计:");
-        info!("  接收包数: {}", self.packets_received);
-        info!("  接收字节: {}", format_bytes(self.bytes_received));
-        info!("  错误数量: {}", self.errors);
-        info!("  用时: {:.2} 秒", duration.as_secs_f64());
-        info!("  平均速率: {}", format_rate(rate_bps));
-
-        if self.packets_received > 0 {
-            let avg_packet_size = self.bytes_received / self.packets_received as u64;
-            info!("  平均包大小: {}", format_bytes(avg_packet_size));
-        }
-    }
-}
+// 统计逻辑已移至 stats.rs 模块
 
 /// 运行接收器
 pub async fn run_receiver(
@@ -89,51 +23,69 @@ pub async fn run_receiver(
     interface: Option<String>,
     max_packets: Option<usize>,
 ) -> Result<()> {
-    let output_path = output_path.as_ref();
+    let output_path = output_path.as_ref().to_path_buf();
 
-    // 验证输入参数
-    ensure_output_directory(output_path)?;
-    validate_port(port)?;
-    let bind_ip = validate_network_config(&address, &network_type)?;
+    // 创建配置
+    let config = AppConfig::for_receiver(
+        output_path.clone(),
+        dataset_name.clone(),
+        address.clone(),
+        port,
+        network_type.clone(),
+        interface,
+        max_packets,
+    )?;
 
-    info!("初始化接收器...");
+    // 验证配置
+    config.validate()?;
+
+    // 创建显示器
+    let display = Display::new(DisplayConfig::default());
+    display.print_welcome();
+    display.print_info("初始化接收器...");
 
     // 创建UDP接收器
-    let receiver_config = ReceiverConfig {
-        bind_address: bind_ip,
-        bind_port: port,
-        network_type: network_type.clone(),
-        interface,
-    };
-
-    let socket = create_udp_receiver(receiver_config)
-        .await
-        .context("创建UDP接收器失败")?;
+    let socket = UdpSocketFactory::create_receiver(&config.network).await?;
 
     // 创建pcap写入器
     let mut writer_config = WriterConfig::default();
     writer_config.common.enable_index_cache = true; // 启用索引
     writer_config.max_packets_per_file = 10000; // 每10000包一个文件
 
-    let mut writer = PcapWriter::new_with_config(output_path, &dataset_name, writer_config)
-        .context("创建pcap写入器失败")?;
+    let mut writer = PcapWriter::new_with_config(&output_path, &dataset_name, writer_config)?;
 
-    let mut stats = ReceiverStats::new();
-    let mut buffer = vec![0u8; 65536]; // 64KB缓冲区
-
-    info!("开始接收数据包...");
-    info!("  监听地址: {}:{}", address, port);
-    info!("  网络类型: {}", network_type);
-    info!("  输出路径: {}", output_path.display());
-    info!("  数据集名称: {}", dataset_name);
-
-    if let Some(max) = max_packets {
-        info!("  最大包数: {}", max);
+    // 获取配置中的缓冲区大小
+    let (buffer_size, max_packets_limit) = if let OperationConfig::Receive {
+        buffer_size,
+        max_packets,
+        ..
+    } = &config.operation
+    {
+        (*buffer_size, *max_packets)
     } else {
-        info!("  最大包数: 无限制");
-    }
+        (65536, None) // 默认64KB缓冲区
+    };
 
-    info!("按 Ctrl+C 停止接收");
+    // 创建进度条
+    let progress_bar = if let Some(max) = max_packets_limit {
+        display.create_progress_bar(max as u64)
+    } else {
+        None // 无限制模式不显示进度条
+    };
+
+    let mut stats = TransferStats::new(progress_bar);
+    let mut buffer = vec![0u8; buffer_size];
+
+    // 显示网络配置
+    display.print_network_config(
+        "接收",
+        &address,
+        port,
+        config.network.get_type_description(),
+    );
+
+    display.print_info("开始接收数据包");
+    display.print_info("按 Ctrl+C 停止接收");
 
     loop {
         tokio::select! {
@@ -160,15 +112,13 @@ pub async fn run_receiver(
                                 } else {
                                     stats.update(bytes_received);
 
-                                    // 每1000个包输出一次进度
-                                    if stats.packets_received % 1000 == 0 {
-                                        stats.print_progress();
-                                    }
+                                    // 更新进度显示
+                                    stats.update_progress_receiver(&display);
 
                                     // 检查是否达到最大包数
-                                    if let Some(max) = max_packets {
-                                        if stats.packets_received >= max {
-                                            info!("已达到最大包数限制: {}", max);
+                                    if let Some(max) = max_packets_limit {
+                                        if stats.packets_count() >= max {
+                                            display.print_info(&format!("已达到最大包数限制: {max}"));
                                             break;
                                         }
                                     }
@@ -189,25 +139,30 @@ pub async fn run_receiver(
 
             // 处理Ctrl+C信号
             _ = signal::ctrl_c() => {
-                info!("收到停止信号，正在结束接收...");
+                display.print_info("收到停止信号，正在结束接收...");
                 break;
             }
         }
     }
 
     // 完成写入
-    info!("正在完成数据集写入...");
-    writer.finalize().context("完成pcap写入失败")?;
+    display.print_info("正在完成数据集写入...");
+    writer.finalize()?;
 
     // 输出最终统计
-    stats.print_summary();
+    println!(); // 接收结束和统计信息之间的空行
+    stats.print_summary(&display, "接收统计信息");
 
     // 获取数据集信息
     let dataset_info = writer.get_dataset_info();
-    info!("保存的数据集信息:");
-    info!("  文件数量: {}", dataset_info.file_count);
-    info!("  数据包总数: {}", dataset_info.total_packets);
-    info!("  数据集大小: {}", format_bytes(dataset_info.total_size));
+    display.print_dataset_info(
+        dataset_info.file_count,
+        dataset_info.total_packets as usize,
+        dataset_info.total_size,
+        None,
+    );
+
+    display.print_success("接收操作已成功完成");
 
     Ok(())
 }
