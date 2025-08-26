@@ -9,7 +9,7 @@ use crate::utils::{
 };
 
 /// 网络类型枚举
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetworkType {
     /// 单播
     Unicast,
@@ -19,11 +19,20 @@ pub enum NetworkType {
     Multicast,
 }
 
-/// 应用程序配置
+/// 发送器应用程序配置
 #[derive(Debug, Clone)]
-pub struct AppConfig {
+pub struct SenderAppConfig {
     pub network: NetworkConfig,
-    pub operation: OperationConfig,
+    pub dataset_path: PathBuf,
+}
+
+/// 接收器应用程序配置
+#[derive(Debug, Clone)]
+pub struct ReceiverAppConfig {
+    pub network: NetworkConfig,
+    pub output_path: PathBuf,
+    pub dataset_name: String,
+    pub buffer_size: usize,
 }
 
 /// 网络配置
@@ -33,25 +42,6 @@ pub struct NetworkConfig {
     pub port: u16,
     pub network_type: NetworkType,
     pub interface: Option<String>,
-}
-
-/// 操作配置（发送或接收）
-#[derive(Debug, Clone)]
-pub enum OperationConfig {
-    Send {
-        #[allow(dead_code)]
-        dataset_path: PathBuf,
-        timing_enabled: bool,
-        max_delay_threshold_ms: u64,
-    },
-    Receive {
-        #[allow(dead_code)]
-        output_path: PathBuf,
-        #[allow(dead_code)]
-        dataset_name: String,
-        max_packets: Option<usize>,
-        buffer_size: usize,
-    },
 }
 
 // Removed unused DisplayConfig struct and its impl
@@ -110,38 +100,9 @@ impl NetworkConfig {
     }
 }
 
-impl OperationConfig {
-    /// 创建发送配置
-    pub fn for_sender(
-        dataset_path: PathBuf,
-    ) -> Result<Self> {
-        validate_dataset_path(&dataset_path)?;
-        Ok(Self::Send {
-            dataset_path,
-            timing_enabled: true, // 启用时序控制以保持原始时间戳
-            max_delay_threshold_ms: 0,
-        })
-    }
-
-    /// 创建接收配置
-    pub fn for_receiver(
-        output_path: PathBuf,
-        dataset_name: String,
-        max_packets: Option<usize>,
-    ) -> Result<Self> {
-        ensure_output_directory(&output_path)?;
-        Ok(Self::Receive {
-            output_path,
-            dataset_name,
-            max_packets,
-            buffer_size: 1048576, // 1MB 缓冲区以减少丢包
-        })
-    }
-}
-
-impl AppConfig {
+impl SenderAppConfig {
     /// 创建发送器配置
-    pub fn for_sender(
+    pub fn new(
         dataset_path: PathBuf,
         address: String,
         port: u16,
@@ -154,21 +115,31 @@ impl AppConfig {
             network_type,
             interface,
         )?;
-        let operation =
-            OperationConfig::for_sender(dataset_path)?;
+        validate_dataset_path(&dataset_path)?;
 
-        Ok(Self { network, operation })
+        Ok(Self {
+            network,
+            dataset_path,
+        })
     }
 
+    /// 验证整个配置
+    pub fn validate(&self) -> Result<()> {
+        self.network.validate()?;
+        validate_dataset_path(&self.dataset_path)?;
+        Ok(())
+    }
+}
+
+impl ReceiverAppConfig {
     /// 创建接收器配置
-    pub fn for_receiver(
+    pub fn new(
         output_path: PathBuf,
         dataset_name: String,
         address: String,
         port: u16,
         network_type: NetworkType,
         interface: Option<String>,
-        max_packets: Option<usize>,
     ) -> Result<Self> {
         let network = NetworkConfig::for_receiver(
             address,
@@ -176,18 +147,21 @@ impl AppConfig {
             network_type,
             interface,
         )?;
-        let operation = OperationConfig::for_receiver(
+        ensure_output_directory(&output_path)?;
+        let buffer_size = 1024 * 1024; // 默认 1MB 缓冲区
+
+        Ok(Self {
+            network,
             output_path,
             dataset_name,
-            max_packets,
-        )?;
-
-        Ok(Self { network, operation })
+            buffer_size,
+        })
     }
 
     /// 验证整个配置
     pub fn validate(&self) -> Result<()> {
         self.network.validate()?;
+        ensure_output_directory(&self.output_path)?;
         Ok(())
     }
 }

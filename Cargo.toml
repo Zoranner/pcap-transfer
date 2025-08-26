@@ -1,5 +1,5 @@
 [package]
-name = "data-transfer"
+name = "pcap-transfer"
 version = "0.1.0"
 edition = "2021"
 authors = ["KimoTech"]
@@ -25,10 +25,11 @@ futures = "0.3"
 
 # 日志
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
 
 # 文件系统
 path-absolutize = "3.1"

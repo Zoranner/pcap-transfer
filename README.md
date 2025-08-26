@@ -30,7 +30,7 @@
 ### 编译
 
 ```bash
-cd data-transfer
+cd pcap-transfer
 cargo build --release
 ```
 

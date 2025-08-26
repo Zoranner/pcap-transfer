@@ -1,0 +1,27 @@
+# 发送器配置 - 使用嵌套的网络配置
+[sender]
+dataset_path = 'C:\Users\KimoTech\Desktop\Repositories\pcap-transfer\examples\received_data'
+
+[sender.network]
+address = "127.0.0.1"
+port = 8080
+network_type = "unicast"
+interface = ""
+
+# 接收器配置 - 使用嵌套的网络配置
+[receiver]
+output_path = "./output"
+dataset_name = "received_data"
+buffer_size = 1048576  # 1MB 缓冲区，与代码中的默认值保持一致
+
+[receiver.network]
+address = "127.0.0.1"
+port = 8081  # 使用不同的端口
+network_type = "unicast"
+interface = ""
+
+# 日志配置
+[logging]
+level = "info"
+file_enabled = false
+file_path = "./logs/app.log"

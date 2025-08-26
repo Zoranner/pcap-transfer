@@ -1,0 +1,59 @@
+//! GUI配置模块
+//!
+//! 定义GUI应用程序的配置结构体和枚举类型。
+
+use crate::config::NetworkType;
+
+/// GUI应用程序状态
+#[derive(Debug, Clone, PartialEq)]
+pub enum AppMode {
+    MainMenu,
+    Sender,
+    Receiver,
+}
+
+/// 发送器配置
+#[derive(Debug, Clone)]
+pub struct SenderConfig {
+    pub dataset_path: String, // 改为String以匹配配置管理器
+    pub address: String,
+    pub port: u16,
+    pub network_type: NetworkType,
+    pub interface: Option<String>,
+}
+
+impl Default for SenderConfig {
+    fn default() -> Self {
+        Self {
+            dataset_path: String::new(),
+            address: "127.0.0.1".to_string(),
+            port: 8080,
+            network_type: NetworkType::Unicast,
+            interface: None,
+        }
+    }
+}
+
+/// 接收器配置
+#[derive(Debug, Clone)]
+pub struct ReceiverConfig {
+    pub output_path: String, // 改为String以匹配配置管理器
+    pub dataset_name: String,
+    pub address: String,
+    pub port: u16,
+    pub network_type: NetworkType,
+    pub interface: Option<String>,
+}
+
+impl Default for ReceiverConfig {
+    fn default() -> Self {
+        Self {
+            output_path: "./output".to_string(),
+            dataset_name: "received_data".to_string(),
+            address: "127.0.0.1".to_string(),
+            port: 8080,
+            network_type: NetworkType::Unicast,
+            interface: None,
+        }
+    }
+}
