@@ -46,7 +46,9 @@ impl TransferStats {
     /// 获取运行时长
     pub fn get_duration(&self) -> Duration {
         match (self.start_time, self.end_time) {
-            (Some(start), Some(end)) => end.duration_since(start),
+            (Some(start), Some(end)) => {
+                end.duration_since(start)
+            }
             (Some(start), None) => start.elapsed(),
             _ => Duration::default(),
         }
@@ -54,9 +56,11 @@ impl TransferStats {
 
     /// 计算传输速率（bps）
     pub fn get_rate_bps(&self) -> f64 {
-        let duration_secs = self.get_duration().as_secs_f64();
+        let duration_secs =
+            self.get_duration().as_secs_f64();
         if duration_secs > 0.0 {
-            (self.bytes_processed as f64 * 8.0) / duration_secs
+            (self.bytes_processed as f64 * 8.0)
+                / duration_secs
         } else {
             0.0
         }
@@ -65,28 +69,43 @@ impl TransferStats {
     /// 计算平均包大小
     pub fn get_average_packet_size(&self) -> Option<u64> {
         if self.packets_processed > 0 {
-            Some(self.bytes_processed / self.packets_processed as u64)
+            Some(
+                self.bytes_processed
+                    / self.packets_processed as u64,
+            )
         } else {
             None
         }
     }
 
     /// 更新进度条（发送模式）
-    pub fn update_progress_sender(&mut self, display: &Display) {
+    pub fn update_progress_sender(
+        &mut self,
+        display: &Display,
+    ) {
         // 每100个数据包或达到100%时更新进度条
-        if self.packets_processed % 100 == 0 || self.packets_processed == 1 {
+        if self.packets_processed % 100 == 0
+            || self.packets_processed == 1
+        {
             let rate_bps = self.get_rate_bps();
             let message = format!(
                 "{:.1} Mbps, {}",
                 rate_bps / 1_000_000.0,
                 format_bytes(self.bytes_processed)
             );
-            display.update_progress(&self.progress_bar, self.packets_processed as u64, &message);
+            display.update_progress(
+                &self.progress_bar,
+                self.packets_processed as u64,
+                &message,
+            );
         }
     }
 
     /// 更新进度条（接收模式）
-    pub fn update_progress_receiver(&mut self, _display: &Display) {
+    pub fn update_progress_receiver(
+        &mut self,
+        _display: &Display,
+    ) {
         if let Some(pb) = &self.progress_bar {
             let rate_bps = self.get_rate_bps();
             let message = format!(
@@ -115,9 +134,14 @@ impl TransferStats {
     }
 
     /// 打印最终统计信息
-    pub fn print_summary(&self, display: &Display, title: &str) {
+    pub fn print_summary(
+        &self,
+        display: &Display,
+        title: &str,
+    ) {
         let duration = self.get_duration();
-        let avg_packet_size = self.get_average_packet_size();
+        let avg_packet_size =
+            self.get_average_packet_size();
 
         display.print_statistics(
             title,

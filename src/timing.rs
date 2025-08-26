@@ -30,11 +30,15 @@ impl TimingController {
     }
 
     /// 等待到指定的数据包时间
-    pub async fn wait_for_packet_time(&mut self, packet_time: DateTime<Utc>) {
+    pub async fn wait_for_packet_time(
+        &mut self,
+        packet_time: DateTime<Utc>,
+    ) {
         if self.first_packet_time.is_none() {
             // 第一个数据包，记录基准时间
             self.first_packet_time = Some(packet_time);
-            self.real_start_time = Some(TokioInstant::now());
+            self.real_start_time =
+                Some(TokioInstant::now());
             return;
         }
 
@@ -53,19 +57,27 @@ impl TimingController {
 
         if target_time > now {
             // 添加最大等待时间限制，避免卡住
-            let max_wait = Duration::from_millis(self.max_delay_threshold_ms);
-            let actual_wait = target_time.duration_since(now).min(max_wait);
+            let max_wait = Duration::from_millis(
+                self.max_delay_threshold_ms,
+            );
+            let actual_wait = target_time
+                .duration_since(now)
+                .min(max_wait);
             if actual_wait > Duration::from_millis(1) {
                 sleep_until(now + actual_wait).await;
             }
         } else if now.duration_since(real_start)
-            > packet_offset + Duration::from_millis(self.max_delay_threshold_ms)
+            > packet_offset
+                + Duration::from_millis(
+                    self.max_delay_threshold_ms,
+                )
         {
             // 如果延迟超过阈值，给出警告
             warn!(
                 "数据包发送延迟: 预期={:.3}s, 实际={:.3}s",
                 packet_offset.as_secs_f64(),
-                now.duration_since(real_start).as_secs_f64()
+                now.duration_since(real_start)
+                    .as_secs_f64()
             );
         }
     }

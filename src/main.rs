@@ -40,7 +40,14 @@ async fn main() -> Result<()> {
             network_type,
             interface,
         } => {
-            sender::run_sender(dataset_path, address, port, network_type, interface).await?;
+            sender::run_sender(
+                dataset_path,
+                address,
+                port,
+                network_type,
+                interface,
+            )
+            .await?;
         }
         Commands::Receive {
             output_path,

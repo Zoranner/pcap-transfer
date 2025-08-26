@@ -90,7 +90,8 @@ pub struct DataTransferApp {
     // Tokio runtime handle
     runtime_handle: Option<tokio::runtime::Handle>,
     // 共享的传输状态引用
-    shared_transfer_state: Option<Arc<Mutex<TransferState>>>,
+    shared_transfer_state:
+        Option<Arc<Mutex<TransferState>>>,
 }
 
 impl Default for DataTransferApp {
@@ -100,7 +101,9 @@ impl Default for DataTransferApp {
             sender_config: SenderConfig::default(),
             receiver_config: ReceiverConfig::default(),
             transfer_state: TransferState::Idle,
-            stats: Arc::new(Mutex::new(TransferStats::default())),
+            stats: Arc::new(Mutex::new(
+                TransferStats::default(),
+            )),
             runtime_handle: None,
             shared_transfer_state: None,
         }
@@ -122,7 +125,9 @@ impl DataTransferApp {
         #[cfg(target_os = "windows")]
         {
             // Windows: 使用微软雅黑
-            if let Ok(font_data) = std::fs::read("C:\\Windows\\Fonts\\msyh.ttc") {
+            if let Ok(font_data) = std::fs::read(
+                "C:\\Windows\\Fonts\\msyh.ttc",
+            ) {
                 fonts.font_data.insert(
                     "chinese_font".to_owned(),
                     egui::FontData::from_owned(font_data),
@@ -141,10 +146,14 @@ impl DataTransferApp {
             ];
 
             for font_path in &font_paths {
-                if let Ok(font_data) = std::fs::read(font_path) {
+                if let Ok(font_data) =
+                    std::fs::read(font_path)
+                {
                     fonts.font_data.insert(
                         "chinese_font".to_owned(),
-                        egui::FontData::from_owned(font_data),
+                        egui::FontData::from_owned(
+                            font_data,
+                        ),
                     );
                     break;
                 }
@@ -160,10 +169,14 @@ impl DataTransferApp {
             ];
 
             for font_path in &font_paths {
-                if let Ok(font_data) = std::fs::read(font_path) {
+                if let Ok(font_data) =
+                    std::fs::read(font_path)
+                {
                     fonts.font_data.insert(
                         "chinese_font".to_owned(),
-                        egui::FontData::from_owned(font_data),
+                        egui::FontData::from_owned(
+                            font_data,
+                        ),
                     );
                     break;
                 }
@@ -191,11 +204,17 @@ impl DataTransferApp {
         let mut style = (*ctx.style()).clone();
         style.text_styles.insert(
             egui::TextStyle::Body,
-            egui::FontId::new(14.0, egui::FontFamily::Proportional),
+            egui::FontId::new(
+                14.0,
+                egui::FontFamily::Proportional,
+            ),
         );
         style.text_styles.insert(
             egui::TextStyle::Button,
-            egui::FontId::new(14.0, egui::FontFamily::Proportional),
+            egui::FontId::new(
+                14.0,
+                egui::FontFamily::Proportional,
+            ),
         );
         ctx.set_style(style);
     }
@@ -242,46 +261,77 @@ impl DataTransferApp {
                 ui.label("数据集路径:");
                 ui.horizontal(|ui| {
                     if ui
-                        .text_edit_singleline(&mut self.sender_config.dataset_path_str)
+                        .text_edit_singleline(
+                            &mut self
+                                .sender_config
+                                .dataset_path_str,
+                        )
                         .changed()
                     {
                         self.sender_config.dataset_path =
-                            PathBuf::from(&self.sender_config.dataset_path_str);
+                            PathBuf::from(
+                                &self
+                                    .sender_config
+                                    .dataset_path_str,
+                            );
                     }
                     if ui.button("浏览").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                            self.sender_config.dataset_path = path.clone();
-                            self.sender_config.dataset_path_str =
-                                path.to_string_lossy().to_string();
+                        if let Some(path) =
+                            rfd::FileDialog::new()
+                                .pick_folder()
+                        {
+                            self.sender_config
+                                .dataset_path =
+                                path.clone();
+                            self.sender_config
+                                .dataset_path_str = path
+                                .to_string_lossy()
+                                .to_string();
                         }
                     }
                 });
                 ui.end_row();
 
                 ui.label("目标地址:");
-                ui.text_edit_singleline(&mut self.sender_config.address);
+                ui.text_edit_singleline(
+                    &mut self.sender_config.address,
+                );
                 ui.end_row();
 
                 ui.label("目标端口:");
-                ui.add(egui::DragValue::new(&mut self.sender_config.port).range(1..=65535));
+                ui.add(
+                    egui::DragValue::new(
+                        &mut self.sender_config.port,
+                    )
+                    .range(1..=65535),
+                );
                 ui.end_row();
 
                 ui.label("网络类型:");
                 egui::ComboBox::from_label("")
-                    .selected_text(format!("{:?}", self.sender_config.network_type))
+                    .selected_text(format!(
+                        "{:?}",
+                        self.sender_config.network_type
+                    ))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(
-                            &mut self.sender_config.network_type,
+                            &mut self
+                                .sender_config
+                                .network_type,
                             NetworkType::Unicast,
                             "Unicast",
                         );
                         ui.selectable_value(
-                            &mut self.sender_config.network_type,
+                            &mut self
+                                .sender_config
+                                .network_type,
                             NetworkType::Broadcast,
                             "Broadcast",
                         );
                         ui.selectable_value(
-                            &mut self.sender_config.network_type,
+                            &mut self
+                                .sender_config
+                                .network_type,
                             NetworkType::Multicast,
                             "Multicast",
                         );
@@ -306,13 +356,18 @@ impl DataTransferApp {
             TransferState::Completed => {
                 ui.label("✅ 发送完成");
                 if ui.button("重新开始").clicked() {
-                    self.transfer_state = TransferState::Idle;
+                    self.transfer_state =
+                        TransferState::Idle;
                 }
             }
             TransferState::Error(ref err) => {
-                ui.colored_label(egui::Color32::RED, format!("❌ 错误: {}", err));
+                ui.colored_label(
+                    egui::Color32::RED,
+                    format!("❌ 错误: {}", err),
+                );
                 if ui.button("重试").clicked() {
-                    self.transfer_state = TransferState::Idle;
+                    self.transfer_state =
+                        TransferState::Idle;
                 }
             }
         }
@@ -342,50 +397,82 @@ impl DataTransferApp {
                 ui.label("输出路径:");
                 ui.horizontal(|ui| {
                     if ui
-                        .text_edit_singleline(&mut self.receiver_config.output_path_str)
+                        .text_edit_singleline(
+                            &mut self
+                                .receiver_config
+                                .output_path_str,
+                        )
                         .changed()
                     {
                         self.receiver_config.output_path =
-                            PathBuf::from(&self.receiver_config.output_path_str);
+                            PathBuf::from(
+                                &self
+                                    .receiver_config
+                                    .output_path_str,
+                            );
                     }
                     if ui.button("浏览").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                            self.receiver_config.output_path = path.clone();
-                            self.receiver_config.output_path_str =
-                                path.to_string_lossy().to_string();
+                        if let Some(path) =
+                            rfd::FileDialog::new()
+                                .pick_folder()
+                        {
+                            self.receiver_config
+                                .output_path = path.clone();
+                            self.receiver_config
+                                .output_path_str = path
+                                .to_string_lossy()
+                                .to_string();
                         }
                     }
                 });
                 ui.end_row();
 
                 ui.label("数据集名称:");
-                ui.text_edit_singleline(&mut self.receiver_config.dataset_name);
+                ui.text_edit_singleline(
+                    &mut self.receiver_config.dataset_name,
+                );
                 ui.end_row();
 
                 ui.label("监听地址:");
-                ui.text_edit_singleline(&mut self.receiver_config.address);
+                ui.text_edit_singleline(
+                    &mut self.receiver_config.address,
+                );
                 ui.end_row();
 
                 ui.label("监听端口:");
-                ui.add(egui::DragValue::new(&mut self.receiver_config.port).range(1..=65535));
+                ui.add(
+                    egui::DragValue::new(
+                        &mut self.receiver_config.port,
+                    )
+                    .range(1..=65535),
+                );
                 ui.end_row();
 
                 ui.label("网络类型:");
                 egui::ComboBox::from_label("")
-                    .selected_text(format!("{:?}", self.receiver_config.network_type))
+                    .selected_text(format!(
+                        "{:?}",
+                        self.receiver_config.network_type
+                    ))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(
-                            &mut self.receiver_config.network_type,
+                            &mut self
+                                .receiver_config
+                                .network_type,
                             NetworkType::Unicast,
                             "Unicast",
                         );
                         ui.selectable_value(
-                            &mut self.receiver_config.network_type,
+                            &mut self
+                                .receiver_config
+                                .network_type,
                             NetworkType::Broadcast,
                             "Broadcast",
                         );
                         ui.selectable_value(
-                            &mut self.receiver_config.network_type,
+                            &mut self
+                                .receiver_config
+                                .network_type,
                             NetworkType::Multicast,
                             "Multicast",
                         );
@@ -410,13 +497,18 @@ impl DataTransferApp {
             TransferState::Completed => {
                 ui.label("✅ 接收完成");
                 if ui.button("重新开始").clicked() {
-                    self.transfer_state = TransferState::Idle;
+                    self.transfer_state =
+                        TransferState::Idle;
                 }
             }
             TransferState::Error(ref err) => {
-                ui.colored_label(egui::Color32::RED, format!("❌ 错误: {}", err));
+                ui.colored_label(
+                    egui::Color32::RED,
+                    format!("❌ 错误: {}", err),
+                );
                 if ui.button("重试").clicked() {
-                    self.transfer_state = TransferState::Idle;
+                    self.transfer_state =
+                        TransferState::Idle;
                 }
             }
         }
@@ -438,26 +530,45 @@ impl DataTransferApp {
                     .spacing([20.0, 4.0])
                     .show(ui, |ui| {
                         ui.label("已处理包数:");
-                        ui.label(stats.get_packets_processed().to_string());
+                        ui.label(
+                            stats
+                                .get_packets_processed()
+                                .to_string(),
+                        );
                         ui.end_row();
 
                         ui.label("已传输字节:");
-                        ui.label(crate::utils::format_bytes(stats.get_bytes_processed()));
+                        ui.label(
+                            crate::utils::format_bytes(
+                                stats.get_bytes_processed(),
+                            ),
+                        );
                         ui.end_row();
 
                         ui.label("传输速率:");
                         ui.label(format!(
                             "{}/s",
-                            crate::utils::format_bytes(stats.get_rate_bps() as u64 / 8)
+                            crate::utils::format_bytes(
+                                stats.get_rate_bps() as u64
+                                    / 8
+                            )
                         ));
                         ui.end_row();
 
                         ui.label("运行时间:");
-                        ui.label(format!("{:.1}s", stats.get_duration().as_secs_f64()));
+                        ui.label(format!(
+                            "{:.1}s",
+                            stats
+                                .get_duration()
+                                .as_secs_f64()
+                        ));
                         ui.end_row();
 
                         ui.label("错误数:");
-                        ui.label(format!("{}", stats.get_errors()));
+                        ui.label(format!(
+                            "{}",
+                            stats.get_errors()
+                        ));
                         ui.end_row();
                     });
             }
@@ -467,18 +578,25 @@ impl DataTransferApp {
     /// 启动发送器
     fn start_sender(&mut self) {
         if self.sender_config.dataset_path_str.is_empty() {
-            self.transfer_state = TransferState::Error("请选择数据集路径".to_string());
+            self.transfer_state = TransferState::Error(
+                "请选择数据集路径".to_string(),
+            );
             return;
         }
 
         // 更新 dataset_path 从字符串
-        self.sender_config.dataset_path = PathBuf::from(&self.sender_config.dataset_path_str);
+        self.sender_config.dataset_path = PathBuf::from(
+            &self.sender_config.dataset_path_str,
+        );
 
-        let dataset_path = self.sender_config.dataset_path.clone();
+        let dataset_path =
+            self.sender_config.dataset_path.clone();
         let address = self.sender_config.address.clone();
         let port = self.sender_config.port;
-        let network_type = self.sender_config.network_type.clone();
-        let interface = self.sender_config.interface.clone();
+        let network_type =
+            self.sender_config.network_type.clone();
+        let interface =
+            self.sender_config.interface.clone();
         let stats = self.stats.clone();
 
         // 重置统计信息
@@ -491,11 +609,15 @@ impl DataTransferApp {
         // 在后台运行发送任务
         if let Some(handle) = &self.runtime_handle {
             let transfer_state_ref =
-                std::sync::Arc::new(std::sync::Mutex::new(TransferState::Running));
-            let transfer_state_clone = transfer_state_ref.clone();
+                std::sync::Arc::new(std::sync::Mutex::new(
+                    TransferState::Running,
+                ));
+            let transfer_state_clone =
+                transfer_state_ref.clone();
 
             // 保存共享状态引用
-            self.shared_transfer_state = Some(transfer_state_ref.clone());
+            self.shared_transfer_state =
+                Some(transfer_state_ref.clone());
 
             handle.spawn(async move {
                 match run_sender_with_gui_stats(
@@ -514,38 +636,54 @@ impl DataTransferApp {
                     }
                     Err(e) => {
                         eprintln!("发送错误: {}", e);
-                        if let Ok(mut state) = transfer_state_ref.lock() {
-                            *state = TransferState::Error(e.to_string());
+                        if let Ok(mut state) =
+                            transfer_state_ref.lock()
+                        {
+                            *state = TransferState::Error(
+                                e.to_string(),
+                            );
                         }
                     }
                 }
             });
         } else {
-            self.transfer_state = TransferState::Error("运行时未初始化".to_string());
+            self.transfer_state = TransferState::Error(
+                "运行时未初始化".to_string(),
+            );
         }
     }
 
     /// 启动接收器
     fn start_receiver(&mut self) {
         if self.receiver_config.output_path_str.is_empty() {
-            self.transfer_state = TransferState::Error("请选择输出路径".to_string());
+            self.transfer_state = TransferState::Error(
+                "请选择输出路径".to_string(),
+            );
             return;
         }
 
         if self.receiver_config.dataset_name.is_empty() {
-            self.transfer_state = TransferState::Error("请输入数据集名称".to_string());
+            self.transfer_state = TransferState::Error(
+                "请输入数据集名称".to_string(),
+            );
             return;
         }
 
         // 更新 output_path 从字符串
-        self.receiver_config.output_path = PathBuf::from(&self.receiver_config.output_path_str);
+        self.receiver_config.output_path = PathBuf::from(
+            &self.receiver_config.output_path_str,
+        );
 
-        let output_path = self.receiver_config.output_path.clone();
-        let dataset_name = self.receiver_config.dataset_name.clone();
+        let output_path =
+            self.receiver_config.output_path.clone();
+        let dataset_name =
+            self.receiver_config.dataset_name.clone();
         let address = self.receiver_config.address.clone();
         let port = self.receiver_config.port;
-        let network_type = self.receiver_config.network_type.clone();
-        let interface = self.receiver_config.interface.clone();
+        let network_type =
+            self.receiver_config.network_type.clone();
+        let interface =
+            self.receiver_config.interface.clone();
         let max_packets = self.receiver_config.max_packets;
         let stats = self.stats.clone();
 
@@ -590,22 +728,36 @@ impl DataTransferApp {
 }
 
 impl eframe::App for DataTransferApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(
+        &mut self,
+        ctx: &egui::Context,
+        _frame: &mut eframe::Frame,
+    ) {
         // 同步共享的传输状态
-        if let Some(shared_state) = &self.shared_transfer_state {
+        if let Some(shared_state) =
+            &self.shared_transfer_state
+        {
             if let Ok(state) = shared_state.lock() {
                 self.transfer_state = state.clone();
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| match self.mode {
-            AppMode::MainMenu => self.render_main_menu(ui),
-            AppMode::Sender => self.render_sender(ui),
-            AppMode::Receiver => self.render_receiver(ui),
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.mode {
+                AppMode::MainMenu => {
+                    self.render_main_menu(ui)
+                }
+                AppMode::Sender => self.render_sender(ui),
+                AppMode::Receiver => {
+                    self.render_receiver(ui)
+                }
+            }
         });
 
         // 定期刷新界面以更新统计信息
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ctx.request_repaint_after(
+            std::time::Duration::from_millis(100),
+        );
     }
 }
 
@@ -633,7 +785,9 @@ async fn run_sender_with_gui_stats(
     config.validate()?;
 
     // 创建UDP发送器
-    let socket = UdpSocketFactory::create_sender(&config.network).await?;
+    let socket =
+        UdpSocketFactory::create_sender(&config.network)
+            .await?;
 
     // 创建pcap读取器
     let dataset_name = dataset_path
@@ -651,22 +805,25 @@ async fn run_sender_with_gui_stats(
     let _dataset_info = reader.get_dataset_info()?;
 
     // 初始化时序控制器
-    let mut timing_controller = if let OperationConfig::Send {
-        timing_enabled,
-        max_delay_threshold_ms,
-        ..
-    } = &config.operation
-    {
-        if *timing_enabled {
-            Some(TimingController::with_delay_threshold(
-                *max_delay_threshold_ms,
-            ))
+    let mut timing_controller =
+        if let OperationConfig::Send {
+            timing_enabled,
+            max_delay_threshold_ms,
+            ..
+        } = &config.operation
+        {
+            if *timing_enabled {
+                Some(
+                    TimingController::with_delay_threshold(
+                        *max_delay_threshold_ms,
+                    ),
+                )
+            } else {
+                None
+            }
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
     // 重置并初始化统计信息
     if let Ok(mut stats_guard) = stats.lock() {
@@ -680,14 +837,20 @@ async fn run_sender_with_gui_stats(
 
         // 时序控制（如果启用）
         if let Some(controller) = &mut timing_controller {
-            controller.wait_for_packet_time(packet_time).await;
+            controller
+                .wait_for_packet_time(packet_time)
+                .await;
         }
 
         // 发送数据包
         match socket
             .send_to(
                 packet_data,
-                format!("{}:{}", config.network.address, config.network.port),
+                format!(
+                    "{}:{}",
+                    config.network.address,
+                    config.network.port
+                ),
             )
             .await
         {
@@ -726,7 +889,9 @@ pub fn run_gui() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 600.0])
-            .with_title("Data Transfer - 数据包传输测试工具"),
+            .with_title(
+                "Data Transfer - 数据包传输测试工具",
+            ),
         ..Default::default()
     };
 
@@ -742,7 +907,9 @@ pub fn run_gui() -> Result<()> {
             Ok(Box::new(app))
         }),
     )
-    .map_err(|e| crate::error::AppError::Gui(e.to_string()))?;
+    .map_err(|e| {
+        crate::error::AppError::Gui(e.to_string())
+    })?;
 
     Ok(())
 }

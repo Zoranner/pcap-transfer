@@ -3,7 +3,9 @@ use std::path::Path;
 use tracing::{debug, error};
 
 use crate::cli::NetworkType;
-use crate::config::{AppConfig, DisplayConfig, OperationConfig};
+use crate::config::{
+    AppConfig, DisplayConfig, OperationConfig,
+};
 use crate::display::Display;
 use crate::error::Result;
 use crate::network::UdpSocketFactory;
@@ -42,7 +44,9 @@ pub async fn run_sender(
     display.print_info("初始化发送器...");
 
     // 创建UDP发送器
-    let socket = UdpSocketFactory::create_sender(&config.network).await?;
+    let socket =
+        UdpSocketFactory::create_sender(&config.network)
+            .await?;
 
     // 创建pcap读取器
     let dataset_name = dataset_path
@@ -59,14 +63,16 @@ pub async fn run_sender(
     // 获取数据集信息
     let dataset_info = reader.get_dataset_info()?;
 
-    let time_span = if let (Some(start_time), Some(end_time)) =
-        (dataset_info.start_timestamp, dataset_info.end_timestamp)
-    {
-        let duration_ns = end_time - start_time;
-        Some(duration_ns as f64 / 1_000_000_000.0)
-    } else {
-        None
-    };
+    let time_span =
+        if let (Some(start_time), Some(end_time)) = (
+            dataset_info.start_timestamp,
+            dataset_info.end_timestamp,
+        ) {
+            let duration_ns = end_time - start_time;
+            Some(duration_ns as f64 / 1_000_000_000.0)
+        } else {
+            None
+        };
 
     display.print_dataset_info(
         dataset_info.file_count,
@@ -83,24 +89,28 @@ pub async fn run_sender(
     );
 
     // 初始化控制器和进度条
-    let mut timing_controller = if let OperationConfig::Send {
-        timing_enabled,
-        max_delay_threshold_ms,
-        ..
-    } = &config.operation
-    {
-        if *timing_enabled {
-            Some(TimingController::with_delay_threshold(
-                *max_delay_threshold_ms,
-            ))
+    let mut timing_controller =
+        if let OperationConfig::Send {
+            timing_enabled,
+            max_delay_threshold_ms,
+            ..
+        } = &config.operation
+        {
+            if *timing_enabled {
+                Some(
+                    TimingController::with_delay_threshold(
+                        *max_delay_threshold_ms,
+                    ),
+                )
+            } else {
+                None
+            }
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
-    let progress_bar = display.create_progress_bar(dataset_info.total_packets);
+    let progress_bar = display
+        .create_progress_bar(dataset_info.total_packets);
     let mut stats = TransferStats::new(progress_bar);
 
     display.print_info("开始数据包传输 (保持原始时序)");
@@ -112,14 +122,20 @@ pub async fn run_sender(
 
         // 时序控制（如果启用）
         if let Some(controller) = &mut timing_controller {
-            controller.wait_for_packet_time(packet_time).await;
+            controller
+                .wait_for_packet_time(packet_time)
+                .await;
         }
 
         // 发送数据包
         match socket
             .send_to(
                 packet_data,
-                format!("{}:{}", config.network.address, config.network.port),
+                format!(
+                    "{}:{}",
+                    config.network.address,
+                    config.network.port
+                ),
             )
             .await
         {

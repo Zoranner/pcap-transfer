@@ -3,10 +3,12 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
 
 /// 验证IP地址格式
-pub fn validate_ip_address(address: &str) -> Result<IpAddr> {
-    address
-        .parse()
-        .with_context(|| format!("无效的IP地址格式: {address}"))
+pub fn validate_ip_address(
+    address: &str,
+) -> Result<IpAddr> {
+    address.parse().with_context(|| {
+        format!("无效的IP地址格式: {address}")
+    })
 }
 
 /// 验证端口范围
@@ -20,11 +22,17 @@ pub fn validate_port(port: u16) -> Result<u16> {
 /// 检查数据集路径是否存在
 pub fn validate_dataset_path(path: &Path) -> Result<()> {
     if !path.exists() {
-        anyhow::bail!("数据集路径不存在: {}", path.display());
+        anyhow::bail!(
+            "数据集路径不存在: {}",
+            path.display()
+        );
     }
 
     if !path.is_dir() {
-        anyhow::bail!("数据集路径必须是目录: {}", path.display());
+        anyhow::bail!(
+            "数据集路径必须是目录: {}",
+            path.display()
+        );
     }
 
     Ok(())
@@ -33,12 +41,21 @@ pub fn validate_dataset_path(path: &Path) -> Result<()> {
 /// 创建输出目录（如果不存在）
 pub fn ensure_output_directory(path: &Path) -> Result<()> {
     if !path.exists() {
-        std::fs::create_dir_all(path)
-            .with_context(|| format!("创建输出目录失败: {}", path.display()))?;
+        std::fs::create_dir_all(path).with_context(
+            || {
+                format!(
+                    "创建输出目录失败: {}",
+                    path.display()
+                )
+            },
+        )?;
     }
 
     if !path.is_dir() {
-        anyhow::bail!("输出路径必须是目录: {}", path.display());
+        anyhow::bail!(
+            "输出路径必须是目录: {}",
+            path.display()
+        );
     }
 
     Ok(())

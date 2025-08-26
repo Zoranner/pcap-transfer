@@ -20,7 +20,9 @@ impl Display {
         if self.config.use_colors {
             println!(
                 "{}",
-                "Data Transfer - 数据包传输测试工具".bright_cyan().bold()
+                "Data Transfer - 数据包传输测试工具"
+                    .bright_cyan()
+                    .bold()
             );
             println!("{}", "=".repeat(60).bright_blue());
         } else {
@@ -32,7 +34,11 @@ impl Display {
     /// 打印成功信息
     pub fn print_success(&self, message: &str) {
         if self.config.use_colors {
-            println!("\n[{}] {}", "SUCCESS".green().bold(), message.green());
+            println!(
+                "\n[{}] {}",
+                "SUCCESS".green().bold(),
+                message.green()
+            );
         } else {
             println!("\n[SUCCESS] {message}");
         }
@@ -41,14 +47,21 @@ impl Display {
     /// 打印信息
     pub fn print_info(&self, message: &str) {
         if self.config.use_colors {
-            println!("\n[{}] {}", "INFO".blue().bold(), message);
+            println!(
+                "\n[{}] {}",
+                "INFO".blue().bold(),
+                message
+            );
         } else {
             println!("\n[INFO] {message}");
         }
     }
 
     /// 创建进度条
-    pub fn create_progress_bar(&self, total: u64) -> Option<ProgressBar> {
+    pub fn create_progress_bar(
+        &self,
+        total: u64,
+    ) -> Option<ProgressBar> {
         if !self.config.show_progress {
             return None;
         }
@@ -64,7 +77,12 @@ impl Display {
     }
 
     /// 更新进度条
-    pub fn update_progress(&self, pb: &Option<ProgressBar>, position: u64, message: &str) {
+    pub fn update_progress(
+        &self,
+        pb: &Option<ProgressBar>,
+        position: u64,
+        message: &str,
+    ) {
         if let Some(pb) = pb {
             pb.set_position(position);
             pb.set_message(message.to_string());
@@ -72,7 +90,11 @@ impl Display {
     }
 
     /// 完成进度条
-    pub fn finish_progress(&self, pb: &Option<ProgressBar>, message: &str) {
+    pub fn finish_progress(
+        &self,
+        pb: &Option<ProgressBar>,
+        message: &str,
+    ) {
         if let Some(pb) = pb {
             pb.finish_with_message(message.to_string()); // 保留进度条并显示完成消息
             println!();
@@ -88,7 +110,10 @@ impl Display {
         time_span: Option<f64>,
     ) {
         if self.config.use_colors {
-            println!("\n{}", "数据集信息:".bright_cyan().bold());
+            println!(
+                "\n{}",
+                "数据集信息:".bright_cyan().bold()
+            );
         } else {
             println!("\n数据集信息:");
         }
@@ -140,16 +165,28 @@ impl Display {
         );
 
         if let Some(avg_size) = avg_packet_size {
-            println!(", 平均大小: {}", format_bytes(avg_size));
+            println!(
+                ", 平均大小: {}",
+                format_bytes(avg_size)
+            );
         } else {
             println!();
         }
     }
 
     /// 打印网络配置信息
-    pub fn print_network_config(&self, mode: &str, address: &str, port: u16, network_type: &str) {
+    pub fn print_network_config(
+        &self,
+        mode: &str,
+        address: &str,
+        port: u16,
+        network_type: &str,
+    ) {
         if self.config.use_colors {
-            println!("\n{}", "网络配置:".bright_cyan().bold());
+            println!(
+                "\n{}",
+                "网络配置:".bright_cyan().bold()
+            );
         } else {
             println!("\n网络配置:");
         }

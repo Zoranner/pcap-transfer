@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use crate::cli::NetworkType;
 use crate::error::Result;
 use crate::utils::{
-    ensure_output_directory, is_broadcast_address, is_multicast_address, validate_dataset_path,
+    ensure_output_directory, is_broadcast_address,
+    is_multicast_address, validate_dataset_path,
     validate_ip_address, validate_port,
 };
 
@@ -73,7 +74,10 @@ impl NetworkConfig {
         interface: Option<String>,
     ) -> Result<Self> {
         let validated_port = validate_port(port)?;
-        let validated_ip = validate_network_config(&address, &network_type)?;
+        let validated_ip = validate_network_config(
+            &address,
+            &network_type,
+        )?;
 
         Ok(Self {
             address: validated_ip,
@@ -91,7 +95,10 @@ impl NetworkConfig {
         interface: Option<String>,
     ) -> Result<Self> {
         let validated_port = validate_port(port)?;
-        let validated_ip = validate_network_config(&address, &network_type)?;
+        let validated_ip = validate_network_config(
+            &address,
+            &network_type,
+        )?;
 
         Ok(Self {
             address: validated_ip,
@@ -113,14 +120,19 @@ impl NetworkConfig {
     /// 检查配置是否有效
     pub fn validate(&self) -> Result<()> {
         validate_port(self.port)?;
-        validate_network_config_by_ip(&self.address, &self.network_type)?;
+        validate_network_config_by_ip(
+            &self.address,
+            &self.network_type,
+        )?;
         Ok(())
     }
 }
 
 impl OperationConfig {
     /// 创建发送配置
-    pub fn for_sender(dataset_path: PathBuf) -> Result<Self> {
+    pub fn for_sender(
+        dataset_path: PathBuf,
+    ) -> Result<Self> {
         validate_dataset_path(&dataset_path)?;
         Ok(Self::Send {
             dataset_path,
@@ -154,8 +166,14 @@ impl AppConfig {
         network_type: NetworkType,
         interface: Option<String>,
     ) -> Result<Self> {
-        let network = NetworkConfig::for_sender(address, port, network_type, interface)?;
-        let operation = OperationConfig::for_sender(dataset_path)?;
+        let network = NetworkConfig::for_sender(
+            address,
+            port,
+            network_type,
+            interface,
+        )?;
+        let operation =
+            OperationConfig::for_sender(dataset_path)?;
         let display = DisplayConfig::default();
 
         Ok(Self {
@@ -175,8 +193,17 @@ impl AppConfig {
         interface: Option<String>,
         max_packets: Option<usize>,
     ) -> Result<Self> {
-        let network = NetworkConfig::for_receiver(address, port, network_type, interface)?;
-        let operation = OperationConfig::for_receiver(output_path, dataset_name, max_packets)?;
+        let network = NetworkConfig::for_receiver(
+            address,
+            port,
+            network_type,
+            interface,
+        )?;
+        let operation = OperationConfig::for_receiver(
+            output_path,
+            dataset_name,
+            max_packets,
+        )?;
         let display = DisplayConfig::default();
 
         Ok(Self {
@@ -194,18 +221,27 @@ impl AppConfig {
 }
 
 /// 验证网络配置（原网络模块函数的重构版本）
-pub fn validate_network_config(address: &str, network_type: &NetworkType) -> Result<IpAddr> {
+pub fn validate_network_config(
+    address: &str,
+    network_type: &NetworkType,
+) -> Result<IpAddr> {
     let ip_addr = validate_ip_address(address)?;
     validate_network_config_by_ip(&ip_addr, network_type)?;
     Ok(ip_addr)
 }
 
 /// 按IP地址验证网络配置
-fn validate_network_config_by_ip(ip_addr: &IpAddr, network_type: &NetworkType) -> Result<()> {
+fn validate_network_config_by_ip(
+    ip_addr: &IpAddr,
+    network_type: &NetworkType,
+) -> Result<()> {
     match network_type {
         NetworkType::Broadcast => {
             if !is_broadcast_address(ip_addr) {
-                tracing::warn!("地址{}可能不是有效的广播地址", ip_addr);
+                tracing::warn!(
+                    "地址{}可能不是有效的广播地址",
+                    ip_addr
+                );
             }
         }
         NetworkType::Multicast => {
@@ -217,8 +253,13 @@ fn validate_network_config_by_ip(ip_addr: &IpAddr, network_type: &NetworkType) -
             }
         }
         NetworkType::Unicast => {
-            if is_broadcast_address(ip_addr) || is_multicast_address(ip_addr) {
-                tracing::warn!("单播模式使用了特殊地址: {}", ip_addr);
+            if is_broadcast_address(ip_addr)
+                || is_multicast_address(ip_addr)
+            {
+                tracing::warn!(
+                    "单播模式使用了特殊地址: {}",
+                    ip_addr
+                );
             }
         }
     }

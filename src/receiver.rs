@@ -5,7 +5,9 @@ use tokio::signal;
 use tracing::{debug, error};
 
 use crate::cli::NetworkType;
-use crate::config::{AppConfig, DisplayConfig, OperationConfig};
+use crate::config::{
+    AppConfig, DisplayConfig, OperationConfig,
+};
 use crate::display::Display;
 use crate::error::Result;
 use crate::network::UdpSocketFactory;
@@ -45,29 +47,37 @@ pub async fn run_receiver(
     display.print_info("初始化接收器...");
 
     // 创建UDP接收器
-    let socket = UdpSocketFactory::create_receiver(&config.network).await?;
+    let socket =
+        UdpSocketFactory::create_receiver(&config.network)
+            .await?;
 
     // 创建pcap写入器
     let mut writer_config = WriterConfig::default();
     writer_config.common.enable_index_cache = true; // 启用索引
     writer_config.max_packets_per_file = 10000; // 每10000包一个文件
 
-    let mut writer = PcapWriter::new_with_config(&output_path, &dataset_name, writer_config)?;
+    let mut writer = PcapWriter::new_with_config(
+        &output_path,
+        &dataset_name,
+        writer_config,
+    )?;
 
     // 获取配置中的缓冲区大小
-    let (buffer_size, max_packets_limit) = if let OperationConfig::Receive {
-        buffer_size,
-        max_packets,
-        ..
-    } = &config.operation
-    {
-        (*buffer_size, *max_packets)
-    } else {
-        (65536, None) // 默认64KB缓冲区
-    };
+    let (buffer_size, max_packets_limit) =
+        if let OperationConfig::Receive {
+            buffer_size,
+            max_packets,
+            ..
+        } = &config.operation
+        {
+            (*buffer_size, *max_packets)
+        } else {
+            (65536, None) // 默认64KB缓冲区
+        };
 
     // 创建进度条
-    let progress_bar = if let Some(max) = max_packets_limit {
+    let progress_bar = if let Some(max) = max_packets_limit
+    {
         display.create_progress_bar(max as u64)
     } else {
         None // 无限制模式不显示进度条

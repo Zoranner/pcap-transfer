@@ -4,11 +4,16 @@ use std::path::PathBuf;
 /// 数据包传输测试工具
 #[derive(Parser, Debug)]
 #[command(name = "data-transfer")]
-#[command(about = "基于pcapfile-io的高性能数据包传输测试工具")]
+#[command(
+    about = "基于pcapfile-io的高性能数据包传输测试工具"
+)]
 #[command(version = "0.1.0")]
 pub struct Args {
     /// 强制使用命令行模式（默认使用 GUI）
-    #[arg(long, help = "强制使用命令行界面，默认启动图形界面")]
+    #[arg(
+        long,
+        help = "强制使用命令行界面，默认启动图形界面"
+    )]
     pub cli: bool,
 
     #[command(subcommand)]
@@ -33,7 +38,12 @@ pub enum Commands {
         port: u16,
 
         /// 网络类型
-        #[arg(short, long, value_enum, default_value = "unicast")]
+        #[arg(
+            short,
+            long,
+            value_enum,
+            default_value = "unicast"
+        )]
         network_type: NetworkType,
 
         /// 网络接口（可选，对于多播/广播）
@@ -60,7 +70,12 @@ pub enum Commands {
         port: u16,
 
         /// 网络类型
-        #[arg(short, long, value_enum, default_value = "unicast")]
+        #[arg(
+            short,
+            long,
+            value_enum,
+            default_value = "unicast"
+        )]
         network_type: NetworkType,
 
         /// 网络接口（可选，对于多播/广播）
@@ -85,7 +100,10 @@ pub enum NetworkType {
 }
 
 impl std::fmt::Display for NetworkType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
         match self {
             NetworkType::Unicast => write!(f, "单播"),
             NetworkType::Broadcast => write!(f, "广播"),

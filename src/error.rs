@@ -32,11 +32,15 @@ pub enum DataTransferError {
 
 impl From<anyhow::Error> for DataTransferError {
     fn from(err: anyhow::Error) -> Self {
-        if let Some(io_error) = err.downcast_ref::<std::io::Error>() {
-            return DataTransferError::Network(std::io::Error::new(
-                io_error.kind(),
-                err.to_string(),
-            ));
+        if let Some(io_error) =
+            err.downcast_ref::<std::io::Error>()
+        {
+            return DataTransferError::Network(
+                std::io::Error::new(
+                    io_error.kind(),
+                    err.to_string(),
+                ),
+            );
         }
         DataTransferError::config(err.to_string())
     }
@@ -56,7 +60,10 @@ impl DataTransferError {
     }
 
     /// 创建验证错误
-    pub fn validation(field: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn validation(
+        field: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self::Validation {
             field: field.into(),
             message: message.into(),
@@ -65,5 +72,6 @@ impl DataTransferError {
 }
 
 /// 结果类型别名
-pub type Result<T> = std::result::Result<T, DataTransferError>;
+pub type Result<T> =
+    std::result::Result<T, DataTransferError>;
 pub type AppError = DataTransferError;
