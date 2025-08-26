@@ -7,8 +7,12 @@ use std::path::PathBuf;
 #[command(about = "基于pcapfile-io的高性能数据包传输测试工具")]
 #[command(version = "0.1.0")]
 pub struct Args {
+    /// 强制使用命令行模式（默认使用 GUI）
+    #[arg(long, help = "强制使用命令行界面，默认启动图形界面")]
+    pub cli: bool,
+
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 /// 子命令
@@ -70,7 +74,7 @@ pub enum Commands {
 }
 
 /// 网络传输类型
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum NetworkType {
     /// 单播
     Unicast,

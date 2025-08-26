@@ -11,6 +11,7 @@ pub struct TransferStats {
     bytes_processed: u64,
     errors: usize,
     start_time: Option<Instant>,
+    end_time: Option<Instant>,
     progress_bar: Option<ProgressBar>,
 }
 
@@ -35,11 +36,20 @@ impl TransferStats {
         self.errors += 1;
     }
 
+    /// 标记传输完成
+    pub fn finish(&mut self) {
+        if self.end_time.is_none() {
+            self.end_time = Some(Instant::now());
+        }
+    }
+
     /// 获取运行时长
     pub fn get_duration(&self) -> Duration {
-        self.start_time
-            .map(|start| start.elapsed())
-            .unwrap_or_default()
+        match (self.start_time, self.end_time) {
+            (Some(start), Some(end)) => end.duration_since(start),
+            (Some(start), None) => start.elapsed(),
+            _ => Duration::default(),
+        }
     }
 
     /// 计算传输速率（bps）
@@ -122,5 +132,20 @@ impl TransferStats {
     /// 获取包数量
     pub fn packets_count(&self) -> usize {
         self.packets_processed
+    }
+
+    /// 获取已处理的包数量（GUI 用）
+    pub fn get_packets_processed(&self) -> usize {
+        self.packets_processed
+    }
+
+    /// 获取已处理的字节数（GUI 用）
+    pub fn get_bytes_processed(&self) -> u64 {
+        self.bytes_processed
+    }
+
+    /// 获取错误数量（GUI 用）
+    pub fn get_errors(&self) -> usize {
+        self.errors
     }
 }

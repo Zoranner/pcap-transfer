@@ -24,6 +24,10 @@ pub enum DataTransferError {
     /// 验证错误
     #[error("验证失败: {field} - {message}")]
     Validation { field: String, message: String },
+
+    /// GUI 相关错误
+    #[error("GUI错误: {0}")]
+    Gui(String),
 }
 
 impl From<anyhow::Error> for DataTransferError {
@@ -62,3 +66,4 @@ impl DataTransferError {
 
 /// 结果类型别名
 pub type Result<T> = std::result::Result<T, DataTransferError>;
+pub type AppError = DataTransferError;
