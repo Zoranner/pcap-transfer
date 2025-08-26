@@ -98,7 +98,7 @@ pub struct DataTransferApp {
 impl Default for DataTransferApp {
     fn default() -> Self {
         Self {
-            mode: AppMode::Sender,
+            mode: AppMode::MainMenu,
             sender_config: SenderConfig::default(),
             receiver_config: ReceiverConfig::default(),
             transfer_state: TransferState::Idle,
