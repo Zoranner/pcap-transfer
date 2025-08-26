@@ -6,8 +6,8 @@ authors = ["KimoTech"]
 description = "高性能数据包传输测试工具"
 
 [dependencies]
-# 本地pcapfile-io依赖
-pcapfile-io = { path = "../pcapfile-io" }
+# 数据包读写
+pcapfile-io = { version = "0.1.0" }
 
 # 命令行参数解析
 clap = { version = "4.5", features = ["derive"] }
