@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error};
 
-use crate::cli::NetworkType;
-use crate::config::{AppConfig, OperationConfig};
+use crate::config::{
+    AppConfig, NetworkType, OperationConfig,
+};
 use crate::error::Result;
 use crate::network::UdpSocketFactory;
 use crate::stats::TransferStats;
@@ -863,7 +864,7 @@ async fn run_sender_with_gui_stats(
 
     // 重置并初始化统计信息
     if let Ok(mut stats_guard) = stats.lock() {
-        *stats_guard = TransferStats::new(None); // GUI不需要进度条
+        *stats_guard = TransferStats::new(); // GUI不需要进度条
     }
 
     // 读取并发送数据包
@@ -996,7 +997,7 @@ async fn run_receiver_with_gui_stats(
 
     // 重置并初始化统计信息
     if let Ok(mut stats_guard) = stats.lock() {
-        *stats_guard = TransferStats::new(None); // GUI不需要进度条
+        *stats_guard = TransferStats::new(); // GUI不需要进度条
     }
 
     let mut buffer = vec![0u8; buffer_size];

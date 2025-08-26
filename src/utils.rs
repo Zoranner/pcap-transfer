@@ -100,15 +100,4 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// 格式化速率
-pub fn format_rate(bps: f64) -> String {
-    if bps >= 1_000_000_000.0 {
-        format!("{:.2} Gbps", bps / 1_000_000_000.0)
-    } else if bps >= 1_000_000.0 {
-        format!("{:.2} Mbps", bps / 1_000_000.0)
-    } else if bps >= 1_000.0 {
-        format!("{:.2} Kbps", bps / 1_000.0)
-    } else {
-        format!("{bps:.2} bps")
-    }
-}
+// Removed unused format_rate function

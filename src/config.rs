@@ -1,7 +1,6 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use crate::cli::NetworkType;
 use crate::error::Result;
 use crate::utils::{
     ensure_output_directory, is_broadcast_address,
@@ -9,13 +8,22 @@ use crate::utils::{
     validate_ip_address, validate_port,
 };
 
+/// 网络类型枚举
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NetworkType {
+    /// 单播
+    Unicast,
+    /// 广播
+    Broadcast,
+    /// 组播
+    Multicast,
+}
+
 /// 应用程序配置
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub network: NetworkConfig,
     pub operation: OperationConfig,
-    #[allow(dead_code)]
-    pub display: DisplayConfig,
 }
 
 /// 网络配置
@@ -46,24 +54,7 @@ pub enum OperationConfig {
     },
 }
 
-/// 显示配置
-#[derive(Debug, Clone)]
-pub struct DisplayConfig {
-    pub show_progress: bool,
-    pub use_colors: bool,
-    #[allow(dead_code)]
-    pub update_interval_packets: usize,
-}
-
-impl Default for DisplayConfig {
-    fn default() -> Self {
-        Self {
-            show_progress: true,
-            use_colors: true,
-            update_interval_packets: 100,
-        }
-    }
-}
+// Removed unused DisplayConfig struct and its impl
 
 impl NetworkConfig {
     /// 创建发送器网络配置
@@ -106,15 +97,6 @@ impl NetworkConfig {
             network_type,
             interface,
         })
-    }
-
-    /// 获取网络类型的中文描述
-    pub fn get_type_description(&self) -> &'static str {
-        match self.network_type {
-            NetworkType::Unicast => "单播",
-            NetworkType::Broadcast => "广播",
-            NetworkType::Multicast => "组播",
-        }
     }
 
     /// 检查配置是否有效
@@ -174,13 +156,8 @@ impl AppConfig {
         )?;
         let operation =
             OperationConfig::for_sender(dataset_path)?;
-        let display = DisplayConfig::default();
 
-        Ok(Self {
-            network,
-            operation,
-            display,
-        })
+        Ok(Self { network, operation })
     }
 
     /// 创建接收器配置
@@ -204,13 +181,8 @@ impl AppConfig {
             dataset_name,
             max_packets,
         )?;
-        let display = DisplayConfig::default();
 
-        Ok(Self {
-            network,
-            operation,
-            display,
-        })
+        Ok(Self { network, operation })
     }
 
     /// 验证整个配置

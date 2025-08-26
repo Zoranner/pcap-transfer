@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
-use indicatif::ProgressBar;
 use std::time::{Duration, Instant};
 
-use crate::display::Display;
-use crate::utils::format_bytes;
+// Removed display module dependency
+// Removed indicatif and format_bytes dependencies
 
 /// 传输统计信息
 #[derive(Debug, Default)]
@@ -11,9 +10,7 @@ pub struct TransferStats {
     packets_processed: usize,
     bytes_processed: u64,
     errors: usize,
-    start_time: Option<Instant>,
     end_time: Option<Instant>,
-    progress_bar: Option<ProgressBar>,
     // 基于数据包时间戳的统计
     first_packet_timestamp: Option<DateTime<Utc>>,
     last_packet_timestamp: Option<DateTime<Utc>>,
@@ -21,12 +18,8 @@ pub struct TransferStats {
 
 impl TransferStats {
     /// 创建新的统计实例
-    pub fn new(progress_bar: Option<ProgressBar>) -> Self {
-        Self {
-            start_time: Some(Instant::now()),
-            progress_bar,
-            ..Default::default()
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// 更新统计信息（带时间戳）
@@ -57,16 +50,7 @@ impl TransferStats {
         }
     }
 
-    /// 获取运行时长
-    pub fn get_duration(&self) -> Duration {
-        match (self.start_time, self.end_time) {
-            (Some(start), Some(end)) => {
-                end.duration_since(start)
-            }
-            (Some(start), None) => start.elapsed(),
-            _ => Duration::default(),
-        }
-    }
+    // Removed unused get_duration method
 
     /// 获取基于数据包时间戳的持续时间
     pub fn get_packet_duration(&self) -> Option<Duration> {
@@ -100,102 +84,17 @@ impl TransferStats {
         }
     }
 
-    /// 计算平均包大小
-    pub fn get_average_packet_size(&self) -> Option<u64> {
-        if self.packets_processed > 0 {
-            Some(
-                self.bytes_processed
-                    / self.packets_processed as u64,
-            )
-        } else {
-            None
-        }
-    }
+    // Removed unused get_average_packet_size method
 
-    /// 更新进度条（发送模式）
-    pub fn update_progress_sender(
-        &mut self,
-        display: &Display,
-    ) {
-        // 每100个数据包或达到100%时更新进度条
-        if self.packets_processed % 100 == 0
-            || self.packets_processed == 1
-        {
-            let rate_bps =
-                self.get_packet_rate_bps().unwrap_or(0.0);
-            let message = format!(
-                "{:.1} Mbps, {}",
-                rate_bps / 1_000_000.0,
-                format_bytes(self.bytes_processed)
-            );
-            display.update_progress(
-                &self.progress_bar,
-                self.packets_processed as u64,
-                &message,
-            );
-        }
-    }
+    // Removed update_progress_sender method (display dependency removed)
 
-    /// 更新进度条（接收模式）
-    pub fn update_progress_receiver(
-        &mut self,
-        _display: &Display,
-    ) {
-        if let Some(pb) = &self.progress_bar {
-            let rate_bps =
-                self.get_packet_rate_bps().unwrap_or(0.0);
-            let message = format!(
-                "{:.1} Mbps, {}",
-                rate_bps / 1_000_000.0,
-                format_bytes(self.bytes_processed)
-            );
-            pb.set_position(self.packets_processed as u64);
-            pb.set_message(message);
-        }
-    }
+    // Removed update_progress_receiver method (display dependency removed)
 
-    /// 完成进度条
-    pub fn finish_progress(&self, display: &Display) {
-        let final_message = format!(
-            "{:.1} Mbps, {}",
-            self.get_packet_rate_bps().unwrap_or(0.0)
-                / 1_000_000.0,
-            format_bytes(self.bytes_processed)
-        );
-        display.update_progress(
-            &self.progress_bar,
-            self.packets_processed as u64,
-            &final_message,
-        );
-        display.finish_progress(&self.progress_bar, "完成");
-    }
+    // Removed finish_progress method (display dependency removed)
 
-    /// 打印最终统计信息
-    pub fn print_summary(
-        &self,
-        display: &Display,
-        title: &str,
-    ) {
-        let runtime_duration = self.get_duration();
-        let packet_duration = self.get_packet_duration();
-        let avg_packet_size =
-            self.get_average_packet_size();
+    // Removed print_summary method (display dependency removed)
 
-        display.print_statistics_with_packet_duration(
-            title,
-            self.packets_processed,
-            self.bytes_processed,
-            self.errors,
-            runtime_duration,
-            packet_duration,
-            avg_packet_size,
-        );
-    }
-
-    /// 获取包数量
-    pub fn packets_count(&self) -> usize {
-        self.packets_processed
-    }
+    // Removed unused packets_count method
 
     /// 获取已处理的包数量（GUI 用）
     pub fn get_packets_processed(&self) -> usize {
