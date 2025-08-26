@@ -227,13 +227,13 @@ impl DataTransferApp {
         ui.add_space(20.0);
 
         ui.horizontal(|ui| {
-            if ui.button("📤 发送数据包").clicked() {
+            if ui.button("发送数据包").clicked() {
                 self.mode = AppMode::Sender;
             }
 
             ui.add_space(20.0);
 
-            if ui.button("📥 接收数据包").clicked() {
+            if ui.button("接收数据包").clicked() {
                 self.mode = AppMode::Receiver;
             }
         });
@@ -354,20 +354,18 @@ impl DataTransferApp {
                 }
             }
             TransferState::Completed => {
-                ui.label("✅ 发送完成");
+                ui.label("发送完成");
                 if ui.button("重新开始").clicked() {
-                    self.transfer_state =
-                        TransferState::Idle;
+                    self.start_sender();
                 }
             }
             TransferState::Error(ref err) => {
                 ui.colored_label(
                     egui::Color32::RED,
-                    format!("❌ 错误: {}", err),
+                    format!("错误: {}", err),
                 );
                 if ui.button("重试").clicked() {
-                    self.transfer_state =
-                        TransferState::Idle;
+                    self.start_sender();
                 }
             }
         }
@@ -495,20 +493,18 @@ impl DataTransferApp {
                 }
             }
             TransferState::Completed => {
-                ui.label("✅ 接收完成");
+                ui.label("接收完成");
                 if ui.button("重新开始").clicked() {
-                    self.transfer_state =
-                        TransferState::Idle;
+                    self.start_receiver();
                 }
             }
             TransferState::Error(ref err) => {
                 ui.colored_label(
                     egui::Color32::RED,
-                    format!("❌ 错误: {}", err),
+                    format!("错误: {}", err),
                 );
                 if ui.button("重试").clicked() {
-                    self.transfer_state =
-                        TransferState::Idle;
+                    self.start_receiver();
                 }
             }
         }
@@ -545,23 +541,33 @@ impl DataTransferApp {
                         );
                         ui.end_row();
 
-                        ui.label("传输速率:");
-                        ui.label(format!(
-                            "{}/s",
-                            crate::utils::format_bytes(
-                                stats.get_rate_bps() as u64
-                                    / 8
-                            )
-                        ));
+                        ui.label("数据速率:");
+                        if let Some(packet_rate) =
+                            stats.get_packet_rate_bps()
+                        {
+                            ui.label(format!(
+                                "{}/s",
+                                crate::utils::format_bytes(
+                                    packet_rate as u64 / 8
+                                )
+                            ));
+                        } else {
+                            ui.label("未知".to_string());
+                        }
                         ui.end_row();
 
-                        ui.label("运行时间:");
-                        ui.label(format!(
-                            "{:.1}s",
-                            stats
-                                .get_duration()
-                                .as_secs_f64()
-                        ));
+                        ui.label("持续时间:");
+                        if let Some(packet_duration) =
+                            stats.get_packet_duration()
+                        {
+                            ui.label(format!(
+                                "{:.3}s",
+                                packet_duration
+                                    .as_secs_f64()
+                            ));
+                        } else {
+                            ui.label("未知".to_string());
+                        }
                         ui.end_row();
 
                         ui.label("错误数:");
@@ -696,8 +702,19 @@ impl DataTransferApp {
 
         // 在后台运行接收任务
         if let Some(handle) = &self.runtime_handle {
+            let transfer_state_ref =
+                std::sync::Arc::new(std::sync::Mutex::new(
+                    TransferState::Running,
+                ));
+            let transfer_state_clone =
+                transfer_state_ref.clone();
+
+            // 保存共享状态引用
+            self.shared_transfer_state =
+                Some(transfer_state_ref.clone());
+
             handle.spawn(async move {
-                match crate::receiver::run_receiver(
+                match run_receiver_with_gui_stats(
                     output_path,
                     dataset_name,
                     address,
@@ -705,15 +722,23 @@ impl DataTransferApp {
                     network_type,
                     interface,
                     max_packets,
+                    stats,
+                    transfer_state_clone,
                 )
                 .await
                 {
                     Ok(_) => {
-                        // 接收完成 - 在实际应用中可以通过共享状态通知GUI
                         println!("接收任务完成");
                     }
                     Err(e) => {
                         eprintln!("接收错误: {}", e);
+                        if let Ok(mut state) =
+                            transfer_state_ref.lock()
+                        {
+                            *state = TransferState::Error(
+                                e.to_string(),
+                            );
+                        }
                     }
                 }
             });
@@ -723,7 +748,18 @@ impl DataTransferApp {
     /// 停止传输
     fn stop_transfer(&mut self) {
         self.transfer_state = TransferState::Idle;
-        // TODO: 实现停止逻辑
+        // 通过共享状态通知后台任务停止
+        if let Some(shared_state) =
+            &self.shared_transfer_state
+        {
+            if let Ok(mut state) = shared_state.lock() {
+                *state = TransferState::Idle;
+            }
+        }
+        // 固定统计信息，停止时间和速率计算
+        if let Ok(mut stats_guard) = self.stats.lock() {
+            stats_guard.finish();
+        }
     }
 }
 
@@ -832,6 +868,13 @@ async fn run_sender_with_gui_stats(
 
     // 读取并发送数据包
     while let Some(packet) = reader.read_packet()? {
+        // 检查是否需要停止
+        if let Ok(state) = transfer_state.lock() {
+            if matches!(*state, TransferState::Idle) {
+                break;
+            }
+        }
+
         let packet_data = &packet.data;
         let packet_time = packet.capture_time();
 
@@ -860,9 +903,11 @@ async fn run_sender_with_gui_stats(
                     bytes_sent,
                     packet_time.format("%H:%M:%S%.9f")
                 );
-                // 更新共享的统计信息
                 if let Ok(mut stats_guard) = stats.lock() {
-                    stats_guard.update(bytes_sent);
+                    stats_guard.update_with_timestamp(
+                        bytes_sent,
+                        packet_time,
+                    );
                 }
             }
             Err(e) => {
@@ -878,6 +923,162 @@ async fn run_sender_with_gui_stats(
     if let Ok(mut stats_guard) = stats.lock() {
         stats_guard.finish();
     }
+    if let Ok(mut state) = transfer_state.lock() {
+        *state = TransferState::Completed;
+    }
+
+    Ok(())
+}
+
+/// GUI专用的接收器函数，支持共享状态和统计信息
+#[allow(clippy::too_many_arguments)]
+async fn run_receiver_with_gui_stats(
+    output_path: PathBuf,
+    dataset_name: String,
+    address: String,
+    port: u16,
+    network_type: NetworkType,
+    interface: Option<String>,
+    max_packets: Option<usize>,
+    stats: Arc<Mutex<TransferStats>>,
+    transfer_state: Arc<Mutex<TransferState>>,
+) -> Result<()> {
+    use crate::config::{AppConfig, OperationConfig};
+    use crate::network::UdpSocketFactory;
+    use chrono::Utc;
+    use pcapfile_io::{
+        DataPacket, PcapWriter, WriterConfig,
+    };
+    use tracing::{debug, error};
+
+    // 创建配置
+    let config = AppConfig::for_receiver(
+        output_path.clone(),
+        dataset_name.clone(),
+        address.clone(),
+        port,
+        network_type.clone(),
+        interface,
+        max_packets,
+    )?;
+
+    // 验证配置
+    config.validate()?;
+
+    // 创建UDP接收器
+    let socket =
+        UdpSocketFactory::create_receiver(&config.network)
+            .await?;
+
+    // 创建pcap写入器
+    let mut writer_config = WriterConfig::default();
+    writer_config.common.enable_index_cache = true;
+    writer_config.max_packets_per_file = 10000;
+
+    let mut writer = PcapWriter::new_with_config(
+        &output_path,
+        &dataset_name,
+        writer_config,
+    )?;
+
+    // 获取配置中的缓冲区大小
+    let (buffer_size, max_packets_limit) =
+        if let OperationConfig::Receive {
+            buffer_size,
+            max_packets,
+            ..
+        } = &config.operation
+        {
+            (*buffer_size, *max_packets)
+        } else {
+            (65536, None)
+        };
+
+    // 重置并初始化统计信息
+    if let Ok(mut stats_guard) = stats.lock() {
+        *stats_guard = TransferStats::new(None); // GUI不需要进度条
+    }
+
+    let mut buffer = vec![0u8; buffer_size];
+
+    // 接收循环
+    loop {
+        // 使用tokio::select!来同时处理接收和停止检查
+        tokio::select! {
+            recv_result = socket.recv_from(&mut buffer) => {
+                match recv_result {
+                    Ok((bytes_received, source_addr)) => {
+                debug!(
+                    "接收数据包: {} 字节, 来源: {}",
+                    bytes_received,
+                    source_addr
+                );
+
+                // 创建数据包
+                let packet_data = buffer[..bytes_received].to_vec();
+                let capture_time = Utc::now();
+
+                match DataPacket::from_datetime(capture_time, packet_data) {
+                    Ok(packet) => {
+                        // 写入数据包
+                        if let Err(e) = writer.write_packet(&packet) {
+                            error!("写入数据包失败: {}", e);
+                            if let Ok(mut stats_guard) = stats.lock() {
+                                stats_guard.add_error();
+                            }
+                        } else {
+                            // 更新统计信息
+                            if let Ok(mut stats_guard) = stats.lock() {
+                                stats_guard.update_with_timestamp(bytes_received, capture_time);
+                            }
+
+                            // 检查是否达到最大包数
+                            if let Some(max) = max_packets_limit {
+                                if let Ok(stats_guard) = stats.lock() {
+                                    if stats_guard.get_packets_processed() >= max {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("创建数据包失败: {}", e);
+                        if let Ok(mut stats_guard) = stats.lock() {
+                            stats_guard.add_error();
+                        }
+                    }
+                }
+            }
+                    Err(e) => {
+                        error!("接收数据包失败: {}", e);
+                        if let Ok(mut stats_guard) = stats.lock() {
+                            stats_guard.add_error();
+                        }
+                    }
+                }
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(10)) => {
+                // 定期检查停止状态
+                if let Ok(state) = transfer_state.lock() {
+                    if matches!(*state, TransferState::Idle) {
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+    }
+
+    // 完成写入
+    writer.finalize()?;
+
+    // 完成统计信息
+    if let Ok(mut stats_guard) = stats.lock() {
+        stats_guard.finish();
+    }
+
+    // 更新传输状态为完成
     if let Ok(mut state) = transfer_state.lock() {
         *state = TransferState::Completed;
     }

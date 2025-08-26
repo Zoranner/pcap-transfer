@@ -136,8 +136,8 @@ impl OperationConfig {
         validate_dataset_path(&dataset_path)?;
         Ok(Self::Send {
             dataset_path,
-            timing_enabled: true,
-            max_delay_threshold_ms: 100,
+            timing_enabled: true, // 启用时序控制以保持原始时间戳
+            max_delay_threshold_ms: 0,
         })
     }
 
@@ -152,7 +152,7 @@ impl OperationConfig {
             output_path,
             dataset_name,
             max_packets,
-            buffer_size: 65536, // 64KB 默认缓冲区
+            buffer_size: 1048576, // 1MB 缓冲区以减少丢包
         })
     }
 }

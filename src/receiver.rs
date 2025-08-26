@@ -120,7 +120,7 @@ pub async fn run_receiver(
                                     error!("写入数据包失败: {}", e);
                                     stats.add_error();
                                 } else {
-                                    stats.update(bytes_received);
+                                    stats.update_with_timestamp(bytes_received, capture_time);
 
                                     // 更新进度显示
                                     stats.update_progress_receiver(&display);

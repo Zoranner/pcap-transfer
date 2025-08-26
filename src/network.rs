@@ -1,3 +1,4 @@
+use socket2::Socket;
 use std::net::{IpAddr, SocketAddr};
 use tokio::net::UdpSocket as TokioUdpSocket;
 use tracing::{debug, warn};
@@ -156,11 +157,22 @@ async fn configure_receiver_socket(
     socket: TokioUdpSocket,
     config: &NetworkConfig,
 ) -> Result<TokioUdpSocket> {
+    // 转换为标准socket进行配置
+    let std_socket = socket
+        .into_std()
+        .map_err(DataTransferError::Network)?;
+
+    // 设置接收缓冲区大小以减少丢包
+    let socket2 = Socket::from(std_socket);
+    if let Err(e) =
+        socket2.set_recv_buffer_size(2 * 1024 * 1024)
+    {
+        warn!("设置接收缓冲区大小失败: {}", e);
+    }
+    let std_socket: std::net::UdpSocket = socket2.into();
+
     match config.network_type {
         NetworkType::Broadcast => {
-            let std_socket = socket
-                .into_std()
-                .map_err(DataTransferError::Network)?;
             std_socket.set_broadcast(true).map_err(
                 |e| {
                     DataTransferError::config(format!(
@@ -168,16 +180,9 @@ async fn configure_receiver_socket(
                     ))
                 },
             )?;
-
             debug!("UDP广播接收模式已启用");
-            Ok(TokioUdpSocket::from_std(std_socket)
-                .map_err(DataTransferError::Network)?)
         }
         NetworkType::Multicast => {
-            let std_socket = socket
-                .into_std()
-                .map_err(DataTransferError::Network)?;
-
             if let IpAddr::V4(multicast_addr) =
                 config.address
             {
@@ -199,15 +204,15 @@ async fn configure_receiver_socket(
             {
                 warn!("暂不支持IPv6组播");
             }
-
-            Ok(TokioUdpSocket::from_std(std_socket)
-                .map_err(DataTransferError::Network)?)
         }
         NetworkType::Unicast => {
             debug!("UDP单播接收器已创建");
-            Ok(socket)
         }
     }
+
+    // 统一转换回tokio socket
+    TokioUdpSocket::from_std(std_socket)
+        .map_err(DataTransferError::Network)
 }
 
 // 网络配置验证逻辑已移至 config.rs 模块

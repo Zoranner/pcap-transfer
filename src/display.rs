@@ -132,37 +132,49 @@ impl Display {
         }
     }
 
-    /// 打印统计信息
-    pub fn print_statistics(
+    /// 打印统计信息（仅显示数据包时间戳持续时间）
+    #[allow(clippy::too_many_arguments)]
+    pub fn print_statistics_with_packet_duration(
         &self,
         title: &str,
         packets: usize,
         bytes: u64,
         errors: usize,
-        duration: Duration,
+        _runtime_duration: Duration,
+        packet_duration: Option<Duration>,
         avg_packet_size: Option<u64>,
     ) {
-        // 计算速率
-        let rate_bps = if duration.as_secs_f64() > 0.0 {
-            (bytes as f64 * 8.0) / duration.as_secs_f64()
-        } else {
-            0.0
-        };
-
         if self.config.use_colors {
             println!("\n{}", title.bright_green().bold());
         } else {
             println!("\n{title}");
         }
 
-        print!(
-            "  数据包: {}, 字节数: {}, 错误: {}, 耗时: {:.2}s, 速率: {}",
-            packets,
-            format_bytes(bytes),
-            errors,
-            duration.as_secs_f64(),
-            format_rate(rate_bps)
-        );
+        if let Some(duration) = packet_duration {
+            // 基于数据包时间戳计算速率
+            let rate_bps = if duration.as_secs_f64() > 0.0 {
+                (bytes as f64 * 8.0)
+                    / duration.as_secs_f64()
+            } else {
+                0.0
+            };
+
+            print!(
+                "  数据包: {}, 字节数: {}, 错误: {}, 持续时间: {:.3}s, 数据速率: {}",
+                packets,
+                format_bytes(bytes),
+                errors,
+                duration.as_secs_f64(),
+                format_rate(rate_bps)
+            );
+        } else {
+            print!(
+                "  数据包: {}, 字节数: {}, 错误: {}, 持续时间: 未知",
+                packets,
+                format_bytes(bytes),
+                errors
+            );
+        }
 
         if let Some(avg_size) = avg_packet_size {
             println!(

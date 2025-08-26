@@ -56,14 +56,22 @@ impl TimingController {
         let now = TokioInstant::now();
 
         if target_time > now {
-            // 添加最大等待时间限制，避免卡住
-            let max_wait = Duration::from_millis(
-                self.max_delay_threshold_ms,
-            );
-            let actual_wait = target_time
-                .duration_since(now)
-                .min(max_wait);
-            if actual_wait > Duration::from_millis(1) {
+            let wait_duration =
+                target_time.duration_since(now);
+
+            // 如果设置了延迟阈值（非0），则限制最大等待时间
+            let actual_wait =
+                if self.max_delay_threshold_ms > 0 {
+                    let max_wait = Duration::from_millis(
+                        self.max_delay_threshold_ms,
+                    );
+                    wait_duration.min(max_wait)
+                } else {
+                    // 延迟阈值为0时，不限制等待时间
+                    wait_duration
+                };
+
+            if actual_wait > Duration::from_nanos(1) {
                 sleep_until(now + actual_wait).await;
             }
         } else if now.duration_since(real_start)

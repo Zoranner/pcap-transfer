@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use indicatif::ProgressBar;
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,9 @@ pub struct TransferStats {
     start_time: Option<Instant>,
     end_time: Option<Instant>,
     progress_bar: Option<ProgressBar>,
+    // 基于数据包时间戳的统计
+    first_packet_timestamp: Option<DateTime<Utc>>,
+    last_packet_timestamp: Option<DateTime<Utc>>,
 }
 
 impl TransferStats {
@@ -25,10 +29,20 @@ impl TransferStats {
         }
     }
 
-    /// 更新统计信息
-    pub fn update(&mut self, bytes: usize) {
+    /// 更新统计信息（带时间戳）
+    pub fn update_with_timestamp(
+        &mut self,
+        bytes: usize,
+        timestamp: DateTime<Utc>,
+    ) {
         self.packets_processed += 1;
         self.bytes_processed += bytes as u64;
+
+        // 更新时间戳范围
+        if self.first_packet_timestamp.is_none() {
+            self.first_packet_timestamp = Some(timestamp);
+        }
+        self.last_packet_timestamp = Some(timestamp);
     }
 
     /// 增加错误计数
@@ -54,15 +68,35 @@ impl TransferStats {
         }
     }
 
-    /// 计算传输速率（bps）
-    pub fn get_rate_bps(&self) -> f64 {
-        let duration_secs =
-            self.get_duration().as_secs_f64();
-        if duration_secs > 0.0 {
-            (self.bytes_processed as f64 * 8.0)
-                / duration_secs
+    /// 获取基于数据包时间戳的持续时间
+    pub fn get_packet_duration(&self) -> Option<Duration> {
+        match (
+            self.first_packet_timestamp,
+            self.last_packet_timestamp,
+        ) {
+            (Some(first), Some(last)) => {
+                let duration_chrono =
+                    last.signed_duration_since(first);
+                duration_chrono.to_std().ok()
+            }
+            _ => None,
+        }
+    }
+
+    /// 计算数据速率（bps）- 基于数据包时间戳
+    pub fn get_packet_rate_bps(&self) -> Option<f64> {
+        if let Some(duration) = self.get_packet_duration() {
+            let duration_secs = duration.as_secs_f64();
+            if duration_secs > 0.0 {
+                Some(
+                    (self.bytes_processed as f64 * 8.0)
+                        / duration_secs,
+                )
+            } else {
+                Some(0.0)
+            }
         } else {
-            0.0
+            None
         }
     }
 
@@ -87,7 +121,8 @@ impl TransferStats {
         if self.packets_processed % 100 == 0
             || self.packets_processed == 1
         {
-            let rate_bps = self.get_rate_bps();
+            let rate_bps =
+                self.get_packet_rate_bps().unwrap_or(0.0);
             let message = format!(
                 "{:.1} Mbps, {}",
                 rate_bps / 1_000_000.0,
@@ -107,7 +142,8 @@ impl TransferStats {
         _display: &Display,
     ) {
         if let Some(pb) = &self.progress_bar {
-            let rate_bps = self.get_rate_bps();
+            let rate_bps =
+                self.get_packet_rate_bps().unwrap_or(0.0);
             let message = format!(
                 "{:.1} Mbps, {}",
                 rate_bps / 1_000_000.0,
@@ -122,7 +158,8 @@ impl TransferStats {
     pub fn finish_progress(&self, display: &Display) {
         let final_message = format!(
             "{:.1} Mbps, {}",
-            self.get_rate_bps() / 1_000_000.0,
+            self.get_packet_rate_bps().unwrap_or(0.0)
+                / 1_000_000.0,
             format_bytes(self.bytes_processed)
         );
         display.update_progress(
@@ -139,16 +176,18 @@ impl TransferStats {
         display: &Display,
         title: &str,
     ) {
-        let duration = self.get_duration();
+        let runtime_duration = self.get_duration();
+        let packet_duration = self.get_packet_duration();
         let avg_packet_size =
             self.get_average_packet_size();
 
-        display.print_statistics(
+        display.print_statistics_with_packet_duration(
             title,
             self.packets_processed,
             self.bytes_processed,
             self.errors,
-            duration,
+            runtime_duration,
+            packet_duration,
             avg_packet_size,
         );
     }

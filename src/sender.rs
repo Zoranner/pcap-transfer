@@ -145,7 +145,10 @@ pub async fn run_sender(
                     bytes_sent,
                     packet_time.format("%H:%M:%S%.9f")
                 );
-                stats.update(bytes_sent);
+                stats.update_with_timestamp(
+                    bytes_sent,
+                    packet_time,
+                );
                 stats.update_progress_sender(&display);
             }
             Err(e) => {
