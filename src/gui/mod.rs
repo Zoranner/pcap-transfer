@@ -4,6 +4,7 @@ pub mod app;
 pub mod config;
 pub mod font;
 pub mod renderer;
+pub mod widgets;
 
 // 移除未使用的导入
 

@@ -13,22 +13,26 @@ use crate::sender::{
 use crate::stats::TransferStats;
 
 use super::config::{
-    AppMode, ReceiverConfig, SenderConfig,
+    ReceiverConfig, SelectedTab, SenderConfig,
 };
-use super::{font, renderer};
+use super::{font, renderer, widgets};
 
 /// GUI 应用程序
 pub struct DataTransferApp {
-    mode: AppMode,
+    selected_tab: SelectedTab,
     sender_config: SenderConfig,
     receiver_config: ReceiverConfig,
-    transfer_state: TransferState,
-    stats: Arc<Mutex<TransferStats>>,
+    // 发送器状态
+    sender_transfer_state: TransferState,
+    sender_stats: Arc<Mutex<TransferStats>>,
+    sender_shared_state: Option<Arc<Mutex<TransferState>>>,
+    // 接收器状态
+    receiver_transfer_state: TransferState,
+    receiver_stats: Arc<Mutex<TransferStats>>,
+    receiver_shared_state:
+        Option<Arc<Mutex<TransferState>>>,
     // Tokio runtime handle
     runtime_handle: Option<tokio::runtime::Handle>,
-    // 共享的传输状态引用
-    shared_transfer_state:
-        Option<Arc<Mutex<TransferState>>>,
     // 配置管理器
     config_manager: ConfigManager,
 }
@@ -106,15 +110,20 @@ impl Default for DataTransferApp {
         };
 
         Self {
-            mode: AppMode::MainMenu,
+            selected_tab: SelectedTab::Sender,
             sender_config,
             receiver_config,
-            transfer_state: TransferState::Idle,
-            stats: Arc::new(Mutex::new(
+            sender_transfer_state: TransferState::Idle,
+            sender_stats: Arc::new(Mutex::new(
                 TransferStats::default(),
             )),
+            sender_shared_state: None,
+            receiver_transfer_state: TransferState::Idle,
+            receiver_stats: Arc::new(Mutex::new(
+                TransferStats::default(),
+            )),
+            receiver_shared_state: None,
             runtime_handle: None,
-            shared_transfer_state: None,
             config_manager,
         }
     }
@@ -129,125 +138,176 @@ impl DataTransferApp {
 
     /// 渲染发送器界面
     fn render_sender(&mut self, ui: &mut egui::Ui) {
-        renderer::render_page_header(
-            ui,
-            "发送数据包",
-            &mut self.mode,
-            &mut self.transfer_state,
-        );
+        // 下半部分：传输统计 (固定高度)
+        egui::TopBottomPanel::bottom("sender_stats_panel")
+            .resizable(false)
+            .exact_height(200.0)
+            .show(ui.ctx(), |ui| {
+                ui.vertical(|ui| {
+                    ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
+                    ui.heading("传输统计");
+                    ui.separator();
+                    ui.add_space(8.0);
+                    self.render_sender_stats_safely(ui);
+                });
+            });
 
-        // 配置区域
-        renderer::render_sender_config(
-            ui,
-            &mut self.sender_config,
-        );
-        ui.add_space(20.0);
-
-        // 控制按钮
-        let transfer_state = self.transfer_state.clone();
-        let can_start = matches!(
-            transfer_state,
-            TransferState::Idle
-                | TransferState::Error(_)
-                | TransferState::Completed
-        );
-        let can_stop = matches!(
-            transfer_state,
-            TransferState::Running
-        );
-
-        ui.horizontal(|ui| {
-            if can_start && ui.button("开始发送").clicked()
-            {
-                self.start_sender();
-            }
-            if can_stop && ui.button("停止发送").clicked()
-            {
-                self.stop_transfer();
-            }
-
-            match &transfer_state {
-                TransferState::Completed => {
-                    ui.label("发送完成");
-                }
-                TransferState::Error(err) => {
-                    ui.colored_label(
-                        egui::Color32::RED,
-                        format!("错误: {}", err),
+        // 主内容区域：配置和控制区域 (占据剩余空间)
+        egui::CentralPanel::default()
+            .show(ui.ctx(), |ui| {
+                ui.vertical(|ui| {
+                    ui.heading("配置参数");
+                    ui.separator();
+                    ui.add_space(8.0);
+                    
+                    // 配置区域
+                    renderer::render_sender_config(
+                        ui,
+                        &mut self.sender_config,
                     );
-                }
-                _ => {}
-            }
-        });
+                    
+                    ui.add_space(20.0);
+                    
+                    // 控制按钮
+                    let transfer_state =
+                        self.sender_transfer_state.clone();
+                    let can_start = matches!(
+                        transfer_state,
+                        TransferState::Idle
+                            | TransferState::Error(_)
+                            | TransferState::Completed
+                    );
+                    let can_stop = matches!(
+                        transfer_state,
+                        TransferState::Running
+                    );
 
-        ui.add_space(20.0);
+                    ui.horizontal(|ui| {
+                        if can_start && ui.button("开始发送").clicked()
+                        {
+                            self.start_sender();
+                        }
+                        if can_stop && ui.button("停止发送").clicked()
+                        {
+                            self.stop_sender();
+                        }
 
-        // 统计信息
-        self.render_stats_safely(ui);
+                        match &transfer_state {
+                            TransferState::Completed => {
+                                ui.colored_label(
+                                    egui::Color32::GRAY,
+                                    "发送完成"
+                                );
+                            }
+                            TransferState::Error(err) => {
+                                ui.colored_label(
+                                    egui::Color32::RED,
+                                    format!("错误: {}", err),
+                                );
+                            }
+                            _ => {}
+                        }
+                    });
+                });
+            });
     }
 
     /// 渲染接收器界面
     fn render_receiver(&mut self, ui: &mut egui::Ui) {
-        renderer::render_page_header(
-            ui,
-            "接收数据包",
-            &mut self.mode,
-            &mut self.transfer_state,
-        );
+        // 下半部分：传输统计 (固定高度)
+        egui::TopBottomPanel::bottom("receiver_stats_panel")
+            .resizable(false)
+            .exact_height(200.0)
+            .show(ui.ctx(), |ui| {
+                ui.vertical(|ui| {
+                    ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
+                    ui.heading("传输统计");
+                    ui.separator();
+                    ui.add_space(8.0);
+                    self.render_receiver_stats_safely(ui);
+                });
+            });
 
-        // 配置区域
-        renderer::render_receiver_config(
-            ui,
-            &mut self.receiver_config,
-        );
-        ui.add_space(20.0);
-
-        // 控制按钮
-        let transfer_state = self.transfer_state.clone();
-        let can_start = matches!(
-            transfer_state,
-            TransferState::Idle
-                | TransferState::Error(_)
-                | TransferState::Completed
-        );
-        let can_stop = matches!(
-            transfer_state,
-            TransferState::Running
-        );
-
-        ui.horizontal(|ui| {
-            if can_start && ui.button("开始接收").clicked()
-            {
-                self.start_receiver();
-            }
-            if can_stop && ui.button("停止接收").clicked()
-            {
-                self.stop_transfer();
-            }
-
-            match &transfer_state {
-                TransferState::Completed => {
-                    ui.label("接收完成");
-                }
-                TransferState::Error(err) => {
-                    ui.colored_label(
-                        egui::Color32::RED,
-                        format!("错误: {}", err),
+        // 主内容区域：配置和控制区域 (占据剩余空间)
+        egui::CentralPanel::default()
+            .show(ui.ctx(), |ui| {
+                ui.vertical(|ui| {
+                    ui.heading("配置参数");
+                    ui.separator();
+                    ui.add_space(8.0);
+                    
+                    // 配置区域
+                    renderer::render_receiver_config(
+                        ui,
+                        &mut self.receiver_config,
                     );
-                }
-                _ => {}
-            }
-        });
+                    
+                    ui.add_space(20.0);
+                    
+                    // 控制按钮
+                    let transfer_state =
+                        self.receiver_transfer_state.clone();
+                    let can_start = matches!(
+                        transfer_state,
+                        TransferState::Idle
+                            | TransferState::Error(_)
+                            | TransferState::Completed
+                    );
+                    let can_stop = matches!(
+                        transfer_state,
+                        TransferState::Running
+                    );
 
-        ui.add_space(20.0);
+                    ui.horizontal(|ui| {
+                        if can_start && ui.button("开始接收").clicked()
+                        {
+                            self.start_receiver();
+                        }
+                        if can_stop && ui.button("停止接收").clicked()
+                        {
+                            self.stop_receiver();
+                        }
 
-        // 统计信息
-        self.render_stats_safely(ui);
+                        match &transfer_state {
+                            TransferState::Completed => {
+                                ui.colored_label(
+                                    egui::Color32::GRAY,
+                                    "接收完成"
+                                );
+                            }
+                            TransferState::Error(err) => {
+                                ui.colored_label(
+                                    egui::Color32::RED,
+                                    format!("错误: {}", err),
+                                );
+                            }
+                            _ => {}
+                        }
+                    });
+                });
+            });
     }
 
-    /// 安全地渲染统计信息
-    fn render_stats_safely(&self, ui: &mut egui::Ui) {
-        if let Ok(stats) = self.stats.lock() {
+    /// 安全地渲染发送器统计信息
+    fn render_sender_stats_safely(
+        &self,
+        ui: &mut egui::Ui,
+    ) {
+        if let Ok(stats) = self.sender_stats.lock() {
+            renderer::render_stats(ui, &stats);
+        } else {
+            // 如果无法获取锁，显示默认统计信息
+            let default_stats = TransferStats::default();
+            renderer::render_stats(ui, &default_stats);
+        }
+    }
+
+    /// 安全地渲染接收器统计信息
+    fn render_receiver_stats_safely(
+        &self,
+        ui: &mut egui::Ui,
+    ) {
+        if let Ok(stats) = self.receiver_stats.lock() {
             renderer::render_stats(ui, &stats);
         } else {
             // 如果无法获取锁，显示默认统计信息
@@ -259,7 +319,7 @@ impl DataTransferApp {
     /// 启动发送器
     fn start_sender(&mut self) {
         if let Err(e) = self.validate_sender_config() {
-            self.transfer_state =
+            self.sender_transfer_state =
                 TransferState::Error(e.to_string());
             return;
         }
@@ -286,20 +346,21 @@ impl DataTransferApp {
         let network_type = self.sender_config.network_type;
         let interface =
             self.sender_config.interface.clone();
-        let stats = Arc::clone(&self.stats);
+        let stats = Arc::clone(&self.sender_stats);
 
         // 重置统计信息
         if let Ok(mut stats_guard) = stats.lock() {
             *stats_guard = TransferStats::default();
         } else {
             tracing::error!("无法获取统计信息锁");
-            self.transfer_state = TransferState::Error(
-                "统计信息初始化失败".to_string(),
-            );
+            self.sender_transfer_state =
+                TransferState::Error(
+                    "统计信息初始化失败".to_string(),
+                );
             return;
         }
 
-        self.transfer_state = TransferState::Running;
+        self.sender_transfer_state = TransferState::Running;
 
         // 在后台运行发送任务
         if let Some(handle) = &self.runtime_handle {
@@ -310,7 +371,7 @@ impl DataTransferApp {
                 Arc::clone(&transfer_state_ref);
 
             // 保存共享状态引用
-            self.shared_transfer_state =
+            self.sender_shared_state =
                 Some(Arc::clone(&transfer_state_ref));
 
             handle.spawn(async move {
@@ -344,9 +405,10 @@ impl DataTransferApp {
                 }
             });
         } else {
-            self.transfer_state = TransferState::Error(
-                "运行时句柄未初始化".to_string(),
-            );
+            self.sender_transfer_state =
+                TransferState::Error(
+                    "运行时句柄未初始化".to_string(),
+                );
         }
     }
 
@@ -354,7 +416,7 @@ impl DataTransferApp {
     fn start_receiver(&mut self) {
         if let Err(e) = self.validate_receiver_config() {
             tracing::error!("接收器配置验证失败: {}", e);
-            self.transfer_state =
+            self.receiver_transfer_state =
                 TransferState::Error(e.to_string());
             return;
         }
@@ -382,7 +444,7 @@ impl DataTransferApp {
                     tracing::error!(
                         "无法获取 Tokio runtime handle"
                     );
-                    self.transfer_state =
+                    self.receiver_transfer_state =
                         TransferState::Error(
                             "运行时句柄未初始化"
                                 .to_string(),
@@ -395,9 +457,10 @@ impl DataTransferApp {
         // 创建共享的传输状态
         let shared_state =
             Arc::new(Mutex::new(TransferState::Running));
-        self.shared_transfer_state =
+        self.receiver_shared_state =
             Some(Arc::clone(&shared_state));
-        self.transfer_state = TransferState::Running;
+        self.receiver_transfer_state =
+            TransferState::Running;
 
         let output_path = std::path::PathBuf::from(
             &self.receiver_config.output_path,
@@ -410,14 +473,15 @@ impl DataTransferApp {
             self.receiver_config.network_type;
         let interface =
             self.receiver_config.interface.clone();
-        let stats = Arc::clone(&self.stats);
+        let stats = Arc::clone(&self.receiver_stats);
 
         // 重置统计信息
         if let Ok(mut stats_guard) = stats.lock() {
             *stats_guard = TransferStats::default();
         }
 
-        self.transfer_state = TransferState::Running;
+        self.receiver_transfer_state =
+            TransferState::Running;
 
         // 在后台运行接收任务
         if let Some(handle) = &self.runtime_handle {
@@ -458,22 +522,35 @@ impl DataTransferApp {
                 }
             });
         } else {
-            self.transfer_state = TransferState::Error(
-                "运行时句柄未初始化".to_string(),
-            );
+            self.receiver_transfer_state =
+                TransferState::Error(
+                    "运行时句柄未初始化".to_string(),
+                );
         }
     }
 
-    /// 停止传输
-    fn stop_transfer(&mut self) {
+    /// 停止发送器
+    fn stop_sender(&mut self) {
         if let Some(shared_state) =
-            &self.shared_transfer_state
+            &self.sender_shared_state
         {
             if let Ok(mut state) = shared_state.lock() {
                 *state = TransferState::Idle;
             }
         }
-        self.transfer_state = TransferState::Idle;
+        self.sender_transfer_state = TransferState::Idle;
+    }
+
+    /// 停止接收器
+    fn stop_receiver(&mut self) {
+        if let Some(shared_state) =
+            &self.receiver_shared_state
+        {
+            if let Ok(mut state) = shared_state.lock() {
+                *state = TransferState::Idle;
+            }
+        }
+        self.receiver_transfer_state = TransferState::Idle;
     }
 
     /// 验证发送器配置
@@ -540,23 +617,91 @@ impl eframe::App for DataTransferApp {
     ) {
         // 同步共享的传输状态
         if let Some(shared_state) =
-            &self.shared_transfer_state
+            &self.sender_shared_state
         {
             if let Ok(state) = shared_state.lock() {
-                self.transfer_state = state.clone();
+                self.sender_transfer_state = state.clone();
             }
         }
 
+        if let Some(shared_state) =
+            &self.receiver_shared_state
+        {
+            if let Ok(state) = shared_state.lock() {
+                self.receiver_transfer_state =
+                    state.clone();
+            }
+        }
+
+        // 标签按钮区域
+        egui::TopBottomPanel::top("tab_buttons")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.add_space(8.0); 
+                ui.horizontal(|ui| {
+                    // 发送器状态标签按钮
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(
+                            ui.available_width() * 0.5,
+                            40.0,
+                        ),
+                        egui::Layout::left_to_right(
+                            egui::Align::Center,
+                        ),
+                        |ui| {
+                            if widgets::StatusTabButton::new(
+                                "发送器",
+                                self.sender_transfer_state
+                                    .clone(),
+                                self.selected_tab
+                                    == SelectedTab::Sender,
+                            )
+                            .show(ui)
+                            .clicked()
+                            {
+                                self.selected_tab =
+                                    SelectedTab::Sender;
+                            }
+                        },
+                    );
+
+                    // 接收器状态标签按钮
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(
+                            ui.available_width(),
+                            40.0,
+                        ),
+                        egui::Layout::left_to_right(
+                            egui::Align::Center,
+                        ),
+                        |ui| {
+                            if widgets::StatusTabButton::new(
+                                "接收器",
+                                self.receiver_transfer_state
+                                    .clone(),
+                                self.selected_tab
+                                    == SelectedTab::Receiver,
+                            )
+                            .show(ui)
+                            .clicked()
+                            {
+                                self.selected_tab =
+                                    SelectedTab::Receiver;
+                            }
+                        },
+                    );
+                });
+                ui.add_space(8.0); 
+            });
+
+        // 主内容区域
         egui::CentralPanel::default().show(ctx, |ui| {
-            match self.mode {
-                AppMode::MainMenu => {
-                    renderer::render_main_menu(
-                        ui,
-                        &mut self.mode,
-                    )
+            // 根据选中的标签页渲染对应内容
+            match self.selected_tab {
+                SelectedTab::Sender => {
+                    self.render_sender(ui)
                 }
-                AppMode::Sender => self.render_sender(ui),
-                AppMode::Receiver => {
+                SelectedTab::Receiver => {
                     self.render_receiver(ui)
                 }
             }
@@ -583,10 +728,15 @@ impl eframe::App for DataTransferApp {
 pub fn run_gui() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 600.0])
-            .with_title(
-                "Data Transfer - 数据包传输测试工具",
-            ),
+            .with_inner_size([400.0, 600.0])
+            .with_min_inner_size([400.0, 600.0])
+            .with_max_inner_size([400.0, 600.0])
+            .with_resizable(false)
+            .with_decorations(true)
+            .with_title("Pcap Transfer"),
+        // 添加额外的窗口控制选项
+        hardware_acceleration:
+            eframe::HardwareAcceleration::Preferred,
         ..Default::default()
     };
 
@@ -594,7 +744,7 @@ pub fn run_gui() -> Result<()> {
     let runtime_handle = tokio::runtime::Handle::current();
 
     eframe::run_native(
-        "Data Transfer",
+        "Pcap Transfer",
         options,
         Box::new(move |cc| {
             let mut app = DataTransferApp::new(cc);

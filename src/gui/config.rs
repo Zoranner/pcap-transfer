@@ -4,12 +4,17 @@
 
 use crate::config::NetworkType;
 
-/// GUI应用程序状态
+/// 当前选中的标签页
 #[derive(Debug, Clone, PartialEq)]
-pub enum AppMode {
-    MainMenu,
+pub enum SelectedTab {
     Sender,
     Receiver,
+}
+
+impl Default for SelectedTab {
+    fn default() -> Self {
+        Self::Sender
+    }
 }
 
 /// 发送器配置
