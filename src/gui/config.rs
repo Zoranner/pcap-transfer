@@ -56,7 +56,7 @@ impl Default for ReceiverConfig {
             output_path: "./output".to_string(),
             dataset_name: "received_data".to_string(),
             address: "127.0.0.1".to_string(),
-            port: 8080,
+            port: 8080, // 修改为8080，与发送器端口匹配
             network_type: NetworkType::Unicast,
             interface: None,
         }

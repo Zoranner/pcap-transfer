@@ -15,7 +15,7 @@ use crate::stats::TransferStats;
 use super::config::{
     ReceiverConfig, SelectedTab, SenderConfig,
 };
-use super::{font, renderer, widgets};
+use super::{components, font, widgets};
 
 /// GUI 应用程序
 pub struct DataTransferApp {
@@ -153,21 +153,22 @@ impl DataTransferApp {
             });
 
         // 主内容区域：配置和控制区域 (占据剩余空间)
-        egui::CentralPanel::default()
-            .show(ui.ctx(), |ui| {
+        egui::CentralPanel::default().show(
+            ui.ctx(),
+            |ui| {
                 ui.vertical(|ui| {
                     ui.heading("配置参数");
                     ui.separator();
                     ui.add_space(8.0);
-                    
+
                     // 配置区域
-                    renderer::render_sender_config(
+                    components::render_sender_config(
                         ui,
                         &mut self.sender_config,
                     );
-                    
+
                     ui.add_space(20.0);
-                    
+
                     // 控制按钮
                     let transfer_state =
                         self.sender_transfer_state.clone();
@@ -183,11 +184,17 @@ impl DataTransferApp {
                     );
 
                     ui.horizontal(|ui| {
-                        if can_start && ui.button("开始发送").clicked()
+                        if can_start
+                            && ui
+                                .button("开始发送")
+                                .clicked()
                         {
                             self.start_sender();
                         }
-                        if can_stop && ui.button("停止发送").clicked()
+                        if can_stop
+                            && ui
+                                .button("停止发送")
+                                .clicked()
                         {
                             self.stop_sender();
                         }
@@ -196,57 +203,65 @@ impl DataTransferApp {
                             TransferState::Completed => {
                                 ui.colored_label(
                                     egui::Color32::GRAY,
-                                    "发送完成"
+                                    "发送完成",
                                 );
                             }
                             TransferState::Error(err) => {
                                 ui.colored_label(
                                     egui::Color32::RED,
-                                    format!("错误: {}", err),
+                                    format!(
+                                        "错误: {}",
+                                        err
+                                    ),
                                 );
                             }
                             _ => {}
                         }
                     });
                 });
-            });
+            },
+        );
     }
 
     /// 渲染接收器界面
     fn render_receiver(&mut self, ui: &mut egui::Ui) {
         // 下半部分：传输统计 (固定高度)
-        egui::TopBottomPanel::bottom("receiver_stats_panel")
-            .resizable(false)
-            .exact_height(200.0)
-            .show(ui.ctx(), |ui| {
-                ui.vertical(|ui| {
-                    ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
-                    ui.heading("传输统计");
-                    ui.separator();
-                    ui.add_space(8.0);
-                    self.render_receiver_stats_safely(ui);
-                });
+        egui::TopBottomPanel::bottom(
+            "receiver_stats_panel",
+        )
+        .resizable(false)
+        .exact_height(200.0)
+        .show(ui.ctx(), |ui| {
+            ui.vertical(|ui| {
+                ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
+                ui.heading("传输统计");
+                ui.separator();
+                ui.add_space(8.0);
+                self.render_receiver_stats_safely(ui);
             });
+        });
 
         // 主内容区域：配置和控制区域 (占据剩余空间)
-        egui::CentralPanel::default()
-            .show(ui.ctx(), |ui| {
+        egui::CentralPanel::default().show(
+            ui.ctx(),
+            |ui| {
                 ui.vertical(|ui| {
                     ui.heading("配置参数");
                     ui.separator();
                     ui.add_space(8.0);
-                    
+
                     // 配置区域
-                    renderer::render_receiver_config(
+                    components::render_receiver_config(
                         ui,
                         &mut self.receiver_config,
                     );
-                    
+
                     ui.add_space(20.0);
-                    
+
                     // 控制按钮
-                    let transfer_state =
-                        self.receiver_transfer_state.clone();
+                    let transfer_state = self
+                        .receiver_transfer_state
+                        .clone();
                     let can_start = matches!(
                         transfer_state,
                         TransferState::Idle
@@ -259,11 +274,17 @@ impl DataTransferApp {
                     );
 
                     ui.horizontal(|ui| {
-                        if can_start && ui.button("开始接收").clicked()
+                        if can_start
+                            && ui
+                                .button("开始接收")
+                                .clicked()
                         {
                             self.start_receiver();
                         }
-                        if can_stop && ui.button("停止接收").clicked()
+                        if can_stop
+                            && ui
+                                .button("停止接收")
+                                .clicked()
                         {
                             self.stop_receiver();
                         }
@@ -272,20 +293,24 @@ impl DataTransferApp {
                             TransferState::Completed => {
                                 ui.colored_label(
                                     egui::Color32::GRAY,
-                                    "接收完成"
+                                    "接收完成",
                                 );
                             }
                             TransferState::Error(err) => {
                                 ui.colored_label(
                                     egui::Color32::RED,
-                                    format!("错误: {}", err),
+                                    format!(
+                                        "错误: {}",
+                                        err
+                                    ),
                                 );
                             }
                             _ => {}
                         }
                     });
                 });
-            });
+            },
+        );
     }
 
     /// 安全地渲染发送器统计信息
@@ -294,11 +319,11 @@ impl DataTransferApp {
         ui: &mut egui::Ui,
     ) {
         if let Ok(stats) = self.sender_stats.lock() {
-            renderer::render_stats(ui, &stats);
+            components::render_stats(ui, &stats);
         } else {
             // 如果无法获取锁，显示默认统计信息
             let default_stats = TransferStats::default();
-            renderer::render_stats(ui, &default_stats);
+            components::render_stats(ui, &default_stats);
         }
     }
 
@@ -308,11 +333,11 @@ impl DataTransferApp {
         ui: &mut egui::Ui,
     ) {
         if let Ok(stats) = self.receiver_stats.lock() {
-            renderer::render_stats(ui, &stats);
+            components::render_stats(ui, &stats);
         } else {
             // 如果无法获取锁，显示默认统计信息
             let default_stats = TransferStats::default();
-            renderer::render_stats(ui, &default_stats);
+            components::render_stats(ui, &default_stats);
         }
     }
 
@@ -637,7 +662,7 @@ impl eframe::App for DataTransferApp {
         egui::TopBottomPanel::top("tab_buttons")
             .resizable(false)
             .show(ctx, |ui| {
-                ui.add_space(8.0); 
+                ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     // 发送器状态标签按钮
                     ui.allocate_ui_with_layout(
@@ -691,7 +716,7 @@ impl eframe::App for DataTransferApp {
                         },
                     );
                 });
-                ui.add_space(8.0); 
+                ui.add_space(8.0);
             });
 
         // 主内容区域
@@ -726,14 +751,30 @@ impl eframe::App for DataTransferApp {
 
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
+    // 加载应用程序图标
+    let icon_data = match super::icon::create_icon_data() {
+        Ok(icon) => Some(icon),
+        Err(e) => {
+            eprintln!("Warning: Failed to load application icon: {}", e);
+            None
+        }
+    };
+
+    let mut viewport_builder =
+        egui::ViewportBuilder::default()
+            .with_inner_size([400.0, 500.0])
+            .with_min_inner_size([400.0, 500.0])
+            .with_max_inner_size([400.0, 500.0])
+            .with_resizable(true)
+            .with_title("Pcap Transfer");
+
+    // 如果图标加载成功，则设置图标
+    if let Some(icon) = icon_data {
+        viewport_builder = viewport_builder.with_icon(icon);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 600.0])
-            .with_min_inner_size([400.0, 600.0])
-            .with_max_inner_size([400.0, 600.0])
-            .with_resizable(false)
-            .with_decorations(true)
-            .with_title("Pcap Transfer"),
+        viewport: viewport_builder,
         // 添加额外的窗口控制选项
         hardware_acceleration:
             eframe::HardwareAcceleration::Preferred,

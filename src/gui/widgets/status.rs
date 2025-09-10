@@ -63,7 +63,12 @@ impl StatusTabButton {
             4.0,
             bg_color,
         );
-        ui.painter().rect_stroke(button_rect, 4.0, stroke);
+        ui.painter().rect_stroke(
+            button_rect,
+            4.0,
+            stroke,
+            egui::epaint::StrokeKind::Outside,
+        );
 
         // 绘制按钮文本
         let text_color = if self.is_selected {
@@ -127,77 +132,5 @@ impl StatusTabButton {
         }
 
         response
-    }
-}
-
-/// 状态指示器组件
-/// 用于在状态栏中显示简洁的状态信息
-pub struct StatusIndicator {
-    label: String,
-    state: TransferState,
-}
-
-impl StatusIndicator {
-    /// 创建新的状态指示器
-    pub fn new(
-        label: impl Into<String>,
-        state: TransferState,
-    ) -> Self {
-        Self {
-            label: label.into(),
-            state,
-        }
-    }
-
-    /// 渲染状态指示器
-    pub fn show(self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label(&self.label);
-
-            // 状态圆点
-            let dot_radius = 6.0;
-            let dot_color = match self.state {
-                TransferState::Idle => egui::Color32::GRAY,
-                TransferState::Running => {
-                    egui::Color32::GREEN
-                }
-                TransferState::Completed => {
-                    egui::Color32::GRAY
-                }
-                TransferState::Error(_) => {
-                    egui::Color32::RED
-                }
-            };
-
-            let (rect, _) = ui.allocate_exact_size(
-                egui::Vec2::new(
-                    dot_radius * 2.0,
-                    dot_radius * 2.0,
-                ),
-                egui::Sense::hover(),
-            );
-
-            ui.painter().circle_filled(
-                rect.center(),
-                dot_radius,
-                dot_color,
-            );
-
-            // 状态文本
-            let status_text = match self.state {
-                TransferState::Idle => "空闲",
-                TransferState::Running => "运行中",
-                TransferState::Completed => "完成",
-                TransferState::Error(err) => {
-                    ui.colored_label(
-                        egui::Color32::RED,
-                        format!("错误: {}", err),
-                    );
-                    return;
-                }
-            };
-
-            ui.label(status_text);
-        });
     }
 }
