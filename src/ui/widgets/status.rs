@@ -111,21 +111,6 @@ impl StatusTabButton {
         ui.painter()
             .circle_filled(dot_pos, dot_radius, dot_color);
 
-        // 如果是错误状态，绘制感叹号
-        if matches!(self.state, TransferState::Error(_)) {
-            let exclamation_pos =
-                egui::pos2(dot_pos.x, dot_pos.y - 1.0);
-            ui.painter().text(
-                exclamation_pos,
-                egui::Align2::CENTER_CENTER,
-                "!",
-                ui.style().text_styles
-                    [&egui::TextStyle::Button]
-                    .clone(),
-                egui::Color32::WHITE,
-            );
-        }
-
         response
     }
 }
