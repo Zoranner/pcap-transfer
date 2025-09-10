@@ -13,10 +13,10 @@ use crate::utils::helpers::{
 pub enum NetworkType {
     /// 单播
     Unicast,
-    /// 广播
-    Broadcast,
     /// 组播
     Multicast,
+    /// 广播
+    Broadcast,
 }
 
 /// 发送器应用程序配置

@@ -3,3 +3,4 @@
 pub mod manager;
 pub mod paths;
 pub mod types;
+pub mod validator;

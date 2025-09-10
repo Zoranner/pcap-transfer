@@ -1,6 +1,7 @@
 //! UI模块 - 用户界面相关功能
 
 pub mod app;
+pub mod app_state;
 pub mod components;
 pub mod config;
 pub mod fonts;

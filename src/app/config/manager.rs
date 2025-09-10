@@ -13,7 +13,6 @@ use super::types::NetworkType;
 pub struct AppConfig {
     pub sender: SenderConfig,
     pub receiver: ReceiverConfig,
-    pub logging: LoggingConfig,
 }
 
 /// 网络配置
@@ -50,14 +49,6 @@ pub struct ReceiverConfig {
     pub network: NetworkConfig,
 }
 
-/// 日志配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoggingConfig {
-    pub level: String,
-    pub file_enabled: bool,
-    pub file_path: String,
-}
-
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
@@ -76,16 +67,6 @@ impl Default for ReceiverConfig {
             dataset_name: "received_data".to_string(),
             buffer_size: 1048576,
             network: NetworkConfig::default(),
-        }
-    }
-}
-
-impl Default for LoggingConfig {
-    fn default() -> Self {
-        Self {
-            level: "info".to_string(),
-            file_enabled: false,
-            file_path: "./logs/app.log".to_string(),
         }
     }
 }

@@ -5,18 +5,19 @@ use std::sync::{Arc, Mutex};
 use tracing;
 
 use crate::app::config::manager::ConfigManager;
+use crate::app::config::validator::ConfigValidator;
 use crate::app::error::types::{AppError, Result};
-use crate::core::network::receiver::run_receiver_with_gui_stats;
-use crate::core::network::sender::{
-    run_sender_with_gui_stats, TransferState,
-};
+use crate::core::network::sender::TransferState;
+use crate::core::services::transfer_service::TransferService;
 use crate::core::stats::collector::TransferStats;
 
+use super::app_state::AppStateManager;
+use super::components::{AppRenderer, UserAction};
 use super::config::{
     ReceiverConfig, SelectedTab, SenderConfig,
 };
 use super::fonts::loader;
-use super::{components, widgets};
+use super::widgets;
 
 /// GUI 应用程序
 pub struct DataTransferApp {
@@ -34,8 +35,8 @@ pub struct DataTransferApp {
         Option<Arc<Mutex<TransferState>>>,
     // Tokio runtime handle
     runtime_handle: Option<tokio::runtime::Handle>,
-    // 配置管理器
-    config_manager: ConfigManager,
+    // 服务
+    transfer_service: TransferService,
 }
 
 impl Default for DataTransferApp {
@@ -44,18 +45,18 @@ impl Default for DataTransferApp {
             ConfigManager::new("pcap-transfer")
                 .unwrap_or_else(|e| {
                     tracing::error!(
-                        "Failed to create config manager: {}",
-                        e
-                    );
-                    panic!("Unable to create config manager: {}", e);
+                "Failed to create config manager: {}",
+                e
+            );
+                    panic!(
+                "Unable to create config manager: {}",
+                e
+            );
                 });
 
         // 尝试加载配置，如果失败则使用默认配置
         if let Err(e) = config_manager.load() {
-            tracing::warn!(
-                "Failed to load config file, using default config: {}",
-                e
-            );
+            tracing::warn!("Failed to load config file, using default config: {}", e);
         }
 
         // 从配置管理器初始化GUI配置
@@ -118,6 +119,9 @@ impl Default for DataTransferApp {
             },
         };
 
+        let transfer_service =
+            TransferService::new(config_manager);
+
         Self {
             selected_tab: SelectedTab::Sender,
             sender_config,
@@ -133,7 +137,7 @@ impl Default for DataTransferApp {
             )),
             receiver_shared_state: None,
             runtime_handle: None,
-            config_manager,
+            transfer_service,
         }
     }
 }
@@ -145,329 +149,58 @@ impl DataTransferApp {
         Self::default()
     }
 
-    /// 渲染发送器界面
-    fn render_sender(&mut self, ui: &mut egui::Ui) {
-        // 下半部分：传输统计 (固定高度)
-        egui::TopBottomPanel::bottom("sender_stats_panel")
-            .resizable(false)
-            .exact_height(200.0)
-            .show(ui.ctx(), |ui| {
-                ui.vertical(|ui| {
-                    ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
-                    ui.heading("Transfer Statistics");
-                    ui.separator();
-                    ui.add_space(8.0);
-                    self.render_sender_stats_safely(ui);
-                });
-            });
-
-        // 主内容区域：配置和控制区域 (占据剩余空间)
-        egui::CentralPanel::default().show(
-            ui.ctx(),
-            |ui| {
-                ui.vertical(|ui| {
-                    ui.heading("Configuration Parameters");
-                    ui.separator();
-                    ui.add_space(8.0);
-
-                    // 配置区域
-                    components::render_sender_config(
-                        ui,
-                        &mut self.sender_config,
-                    );
-
-                    ui.add_space(20.0);
-
-                    // 控制按钮
-                    let transfer_state =
-                        self.sender_transfer_state.clone();
-                    let can_start = matches!(
-                        transfer_state,
-                        TransferState::Idle
-                            | TransferState::Error(_)
-                            | TransferState::Completed
-                    );
-                    let can_stop = matches!(
-                        transfer_state,
-                        TransferState::Running
-                    );
-
-                    ui.horizontal(|ui| {
-                        if can_start
-                            && ui
-                                .button("Start Sending")
-                                .clicked()
-                        {
-                            self.start_sender();
-                        }
-                        if can_stop
-                            && ui
-                                .button("Stop Sending")
-                                .clicked()
-                        {
-                            self.stop_sender();
-                        }
-
-                        match &transfer_state {
-                            TransferState::Completed => {
-                                ui.colored_label(
-                                    egui::Color32::GRAY,
-                                    "Send Completed",
-                                );
-                            }
-                            TransferState::Error(err) => {
-                                ui.colored_label(
-                                    egui::Color32::RED,
-                                    format!(
-                                        "Error: {}",
-                                        err
-                                    ),
-                                );
-                            }
-                            _ => {}
-                        }
-                    });
-                });
-            },
-        );
-    }
-
-    /// 渲染接收器界面
-    fn render_receiver(&mut self, ui: &mut egui::Ui) {
-        // 下半部分：传输统计 (固定高度)
-        egui::TopBottomPanel::bottom(
-            "receiver_stats_panel",
-        )
-        .resizable(false)
-        .exact_height(200.0)
-        .show(ui.ctx(), |ui| {
-            ui.vertical(|ui| {
-                ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
-                ui.heading("Transfer Statistics");
-                ui.separator();
-                ui.add_space(8.0);
-                self.render_receiver_stats_safely(ui);
-            });
-        });
-
-        // 主内容区域：配置和控制区域 (占据剩余空间)
-        egui::CentralPanel::default().show(
-            ui.ctx(),
-            |ui| {
-                ui.vertical(|ui| {
-                    ui.heading("Configuration Parameters");
-                    ui.separator();
-                    ui.add_space(8.0);
-
-                    // 配置区域
-                    components::render_receiver_config(
-                        ui,
-                        &mut self.receiver_config,
-                    );
-
-                    ui.add_space(20.0);
-
-                    // 控制按钮
-                    let transfer_state = self
-                        .receiver_transfer_state
-                        .clone();
-                    let can_start = matches!(
-                        transfer_state,
-                        TransferState::Idle
-                            | TransferState::Error(_)
-                            | TransferState::Completed
-                    );
-                    let can_stop = matches!(
-                        transfer_state,
-                        TransferState::Running
-                    );
-
-                    ui.horizontal(|ui| {
-                        if can_start
-                            && ui
-                                .button("Start Receiving")
-                                .clicked()
-                        {
-                            self.start_receiver();
-                        }
-                        if can_stop
-                            && ui
-                                .button("Stop Receiving")
-                                .clicked()
-                        {
-                            self.stop_receiver();
-                        }
-
-                        match &transfer_state {
-                            TransferState::Completed => {
-                                ui.colored_label(
-                                    egui::Color32::GRAY,
-                                    "Receive Completed",
-                                );
-                            }
-                            TransferState::Error(err) => {
-                                ui.colored_label(
-                                    egui::Color32::RED,
-                                    format!(
-                                        "Error: {}",
-                                        err
-                                    ),
-                                );
-                            }
-                            _ => {}
-                        }
-                    });
-                });
-            },
-        );
-    }
-
-    /// 安全地渲染发送器统计信息
-    fn render_sender_stats_safely(
-        &self,
-        ui: &mut egui::Ui,
-    ) {
-        if let Ok(stats) = self.sender_stats.lock() {
-            components::render_stats(ui, &stats);
-        } else {
-            // 如果无法获取锁，显示默认统计信息
-            let default_stats = TransferStats::default();
-            components::render_stats(ui, &default_stats);
-        }
-    }
-
-    /// 安全地渲染接收器统计信息
-    fn render_receiver_stats_safely(
-        &self,
-        ui: &mut egui::Ui,
-    ) {
-        if let Ok(stats) = self.receiver_stats.lock() {
-            components::render_stats(ui, &stats);
-        } else {
-            // 如果无法获取锁，显示默认统计信息
-            let default_stats = TransferStats::default();
-            components::render_stats(ui, &default_stats);
-        }
-    }
-
     /// 启动发送器
     fn start_sender(&mut self) {
-        if let Err(e) = self.validate_sender_config() {
+        if let Err(e) =
+            ConfigValidator::validate_sender_config(
+                &self.sender_config,
+            )
+        {
             self.sender_transfer_state =
                 TransferState::Error(e.to_string());
             return;
         }
 
-        // 保存当前配置到配置管理器
-        self.config_manager.update_sender_network_config(
-            self.sender_config.address.clone(),
-            self.sender_config.port,
-            self.sender_config.network_type,
-            self.sender_config.interface.clone(),
-        );
-        self.config_manager.update_sender_config(
-            self.sender_config.dataset_path.clone(),
-        );
-        if let Err(e) = self.config_manager.save() {
-            tracing::warn!("Failed to save config: {}", e);
-        }
-
-        let dataset_path = std::path::PathBuf::from(
-            &self.sender_config.dataset_path,
-        );
-        let address = self.sender_config.address.clone();
-        let port = self.sender_config.port;
-        let network_type = self.sender_config.network_type;
-        let interface =
-            self.sender_config.interface.clone();
-        let stats = Arc::clone(&self.sender_stats);
-
-        // 重置统计信息
-        if let Ok(mut stats_guard) = stats.lock() {
-            *stats_guard = TransferStats::default();
-        } else {
-            tracing::error!("Unable to acquire statistics lock");
-            self.sender_transfer_state =
-                TransferState::Error(
-                    "Statistics initialization failed".to_string(),
-                );
-            return;
-        }
-
-        self.sender_transfer_state = TransferState::Running;
-
-        // 在后台运行发送任务
         if let Some(handle) = &self.runtime_handle {
-            let transfer_state_ref = Arc::new(Mutex::new(
-                TransferState::Running,
-            ));
-            let transfer_state_clone =
-                Arc::clone(&transfer_state_ref);
-
-            // 保存共享状态引用
-            self.sender_shared_state =
-                Some(Arc::clone(&transfer_state_ref));
-
-            handle.spawn(async move {
-                match run_sender_with_gui_stats(
-                    dataset_path,
-                    address,
-                    port,
-                    network_type,
-                    interface,
-                    stats,
-                    transfer_state_clone,
-                )
-                .await
-                {
-                    Ok(_) => {
-                        tracing::info!("Send task completed");
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            "Send task failed: {}",
-                            e
-                        );
-                        if let Ok(mut state) =
-                            transfer_state_ref.lock()
-                        {
-                            *state = TransferState::Error(
-                                e.to_string(),
-                            );
-                        }
-                    }
+            match self.transfer_service.start_sender(
+                &self.sender_config,
+                Arc::clone(&self.sender_stats),
+                handle,
+            ) {
+                Ok(shared_state) => {
+                    self.sender_shared_state =
+                        Some(shared_state);
+                    self.sender_transfer_state =
+                        TransferState::Running;
                 }
-            });
+                Err(e) => {
+                    self.sender_transfer_state =
+                        TransferState::Error(e.to_string());
+                }
+            }
         } else {
             self.sender_transfer_state =
                 TransferState::Error(
-                    "Runtime handle not initialized".to_string(),
+                    "Runtime handle not initialized"
+                        .to_string(),
                 );
         }
     }
 
     /// 启动接收器
     fn start_receiver(&mut self) {
-        if let Err(e) = self.validate_receiver_config() {
-            tracing::error!("Receiver config validation failed: {}", e);
+        if let Err(e) =
+            ConfigValidator::validate_receiver_config(
+                &self.receiver_config,
+            )
+        {
+            tracing::error!(
+                "Receiver config validation failed: {}",
+                e
+            );
             self.receiver_transfer_state =
                 TransferState::Error(e.to_string());
             return;
-        }
-
-        // 保存当前配置到配置管理器
-        self.config_manager.update_receiver_network_config(
-            self.receiver_config.address.clone(),
-            self.receiver_config.port,
-            self.receiver_config.network_type,
-            self.receiver_config.interface.clone(),
-        );
-        self.config_manager.update_receiver_config(
-            self.receiver_config.output_path.clone(),
-            self.receiver_config.dataset_name.clone(),
-        );
-        if let Err(e) = self.config_manager.save() {
-            tracing::warn!("Failed to save config: {}", e);
         }
 
         // 获取当前的 Tokio runtime handle
@@ -475,171 +208,47 @@ impl DataTransferApp {
             match tokio::runtime::Handle::try_current() {
                 Ok(h) => h,
                 Err(_) => {
-                    tracing::error!(
-                        "Unable to get Tokio runtime handle"
-                    );
-                    self.receiver_transfer_state =
-                        TransferState::Error(
-                            "Runtime handle not initialized"
-                                .to_string(),
-                        );
+                    tracing::error!("Unable to get Tokio runtime handle");
+                    self.receiver_transfer_state = TransferState::Error(
+                    "Runtime handle not initialized".to_string(),
+                );
                     return;
                 }
             };
         self.runtime_handle = Some(handle.clone());
 
-        // 创建共享的传输状态
-        let shared_state =
-            Arc::new(Mutex::new(TransferState::Running));
-        self.receiver_shared_state =
-            Some(Arc::clone(&shared_state));
-        self.receiver_transfer_state =
-            TransferState::Running;
-
-        let output_path = std::path::PathBuf::from(
-            &self.receiver_config.output_path,
-        );
-        let dataset_name =
-            self.receiver_config.dataset_name.clone();
-        let address = self.receiver_config.address.clone();
-        let port = self.receiver_config.port;
-        let network_type =
-            self.receiver_config.network_type;
-        let interface =
-            self.receiver_config.interface.clone();
-        let stats = Arc::clone(&self.receiver_stats);
-
-        // 重置统计信息
-        if let Ok(mut stats_guard) = stats.lock() {
-            *stats_guard = TransferStats::default();
-        }
-
-        self.receiver_transfer_state =
-            TransferState::Running;
-
-        // 在后台运行接收任务
-        if let Some(handle) = &self.runtime_handle {
-            let transfer_state_clone =
-                Arc::clone(&shared_state);
-            let transfer_state_for_error =
-                Arc::clone(&shared_state);
-
-            handle.spawn(async move {
-                match run_receiver_with_gui_stats(
-                    output_path,
-                    dataset_name,
-                    address,
-                    port,
-                    network_type,
-                    interface,
-                    stats,
-                    transfer_state_clone,
-                )
-                .await
-                {
-                    Ok(_) => {
-                        tracing::info!("Receive task completed");
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            "Receive task failed: {}",
-                            e
-                        );
-                        if let Ok(mut state) =
-                            transfer_state_for_error.lock()
-                        {
-                            *state = TransferState::Error(
-                                e.to_string(),
-                            );
-                        }
-                    }
-                }
-            });
-        } else {
-            self.receiver_transfer_state =
-                TransferState::Error(
-                    "Runtime handle not initialized".to_string(),
-                );
+        match self.transfer_service.start_receiver(
+            &self.receiver_config,
+            Arc::clone(&self.receiver_stats),
+            &handle,
+        ) {
+            Ok(shared_state) => {
+                self.receiver_shared_state =
+                    Some(shared_state);
+                self.receiver_transfer_state =
+                    TransferState::Running;
+            }
+            Err(e) => {
+                self.receiver_transfer_state =
+                    TransferState::Error(e.to_string());
+            }
         }
     }
 
     /// 停止发送器
     fn stop_sender(&mut self) {
-        if let Some(shared_state) =
-            &self.sender_shared_state
-        {
-            if let Ok(mut state) = shared_state.lock() {
-                *state = TransferState::Idle;
-            }
-        }
+        TransferService::stop_transfer(
+            &self.sender_shared_state,
+        );
         self.sender_transfer_state = TransferState::Idle;
     }
 
     /// 停止接收器
     fn stop_receiver(&mut self) {
-        if let Some(shared_state) =
-            &self.receiver_shared_state
-        {
-            if let Ok(mut state) = shared_state.lock() {
-                *state = TransferState::Idle;
-            }
-        }
-        self.receiver_transfer_state = TransferState::Idle;
-    }
-
-    /// 验证发送器配置
-    fn validate_sender_config(&self) -> Result<()> {
-        if self.sender_config.dataset_path.is_empty() {
-            return Err(AppError::validation(
-                "Dataset Path",
-                "Path cannot be empty",
-            ));
-        }
-
-        let dataset_path = std::path::PathBuf::from(
-            &self.sender_config.dataset_path,
+        TransferService::stop_transfer(
+            &self.receiver_shared_state,
         );
-        if !dataset_path.exists() {
-            return Err(AppError::validation(
-                "Dataset Path",
-                "Path does not exist",
-            ));
-        }
-
-        if self.sender_config.address.is_empty() {
-            return Err(AppError::validation(
-                "Target Address",
-                "Address cannot be empty",
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// 验证接收器配置
-    fn validate_receiver_config(&self) -> Result<()> {
-        if self.receiver_config.output_path.is_empty() {
-            return Err(AppError::validation(
-                "Output Path",
-                "Path cannot be empty",
-            ));
-        }
-
-        if self.receiver_config.dataset_name.is_empty() {
-            return Err(AppError::validation(
-                "Dataset Name",
-                "Name cannot be empty",
-            ));
-        }
-
-        if self.receiver_config.address.is_empty() {
-            return Err(AppError::validation(
-                "Listen Address",
-                "Address cannot be empty",
-            ));
-        }
-
-        Ok(())
+        self.receiver_transfer_state = TransferState::Idle;
     }
 }
 
@@ -650,22 +259,14 @@ impl eframe::App for DataTransferApp {
         _frame: &mut eframe::Frame,
     ) {
         // 同步共享的传输状态
-        if let Some(shared_state) =
-            &self.sender_shared_state
-        {
-            if let Ok(state) = shared_state.lock() {
-                self.sender_transfer_state = state.clone();
-            }
-        }
-
-        if let Some(shared_state) =
-            &self.receiver_shared_state
-        {
-            if let Ok(state) = shared_state.lock() {
-                self.receiver_transfer_state =
-                    state.clone();
-            }
-        }
+        AppStateManager::sync_sender_state(
+            &mut self.sender_transfer_state,
+            &self.sender_shared_state,
+        );
+        AppStateManager::sync_receiver_state(
+            &mut self.receiver_transfer_state,
+            &self.receiver_shared_state,
+        );
 
         // 标签按钮区域
         egui::TopBottomPanel::top("tab_buttons")
@@ -675,52 +276,36 @@ impl eframe::App for DataTransferApp {
                 ui.horizontal(|ui| {
                     // 发送器状态标签按钮
                     ui.allocate_ui_with_layout(
-                        egui::Vec2::new(
-                            ui.available_width() * 0.5,
-                            40.0,
-                        ),
-                        egui::Layout::left_to_right(
-                            egui::Align::Center,
-                        ),
+                        egui::Vec2::new(ui.available_width() * 0.5, 40.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
                         |ui| {
                             if widgets::status::StatusTabButton::new(
                                 "Sender",
-                                self.sender_transfer_state
-                                    .clone(),
-                                self.selected_tab
-                                    == SelectedTab::Sender,
+                                self.sender_transfer_state.clone(),
+                                self.selected_tab == SelectedTab::Sender,
                             )
                             .show(ui)
                             .clicked()
                             {
-                                self.selected_tab =
-                                    SelectedTab::Sender;
+                                self.selected_tab = SelectedTab::Sender;
                             }
                         },
                     );
 
                     // 接收器状态标签按钮
                     ui.allocate_ui_with_layout(
-                        egui::Vec2::new(
-                            ui.available_width(),
-                            40.0,
-                        ),
-                        egui::Layout::left_to_right(
-                            egui::Align::Center,
-                        ),
+                        egui::Vec2::new(ui.available_width(), 40.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
                         |ui| {
                             if widgets::status::StatusTabButton::new(
                                 "Receiver",
-                                self.receiver_transfer_state
-                                    .clone(),
-                                self.selected_tab
-                                    == SelectedTab::Receiver,
+                                self.receiver_transfer_state.clone(),
+                                self.selected_tab == SelectedTab::Receiver,
                             )
                             .show(ui)
                             .clicked()
                             {
-                                self.selected_tab =
-                                    SelectedTab::Receiver;
+                                self.selected_tab = SelectedTab::Receiver;
                             }
                         },
                     );
@@ -733,10 +318,43 @@ impl eframe::App for DataTransferApp {
             // 根据选中的标签页渲染对应内容
             match self.selected_tab {
                 SelectedTab::Sender => {
-                    self.render_sender(ui)
+                    let action = AppRenderer::render_sender(
+                        ui,
+                        &mut self.sender_config,
+                        &self.sender_transfer_state,
+                        &self.sender_stats,
+                    );
+
+                    // 处理用户动作
+                    match action {
+                        UserAction::StartSender => {
+                            self.start_sender();
+                        }
+                        UserAction::StopSender => {
+                            self.stop_sender();
+                        }
+                        _ => {}
+                    }
                 }
                 SelectedTab::Receiver => {
-                    self.render_receiver(ui)
+                    let action =
+                        AppRenderer::render_receiver(
+                            ui,
+                            &mut self.receiver_config,
+                            &self.receiver_transfer_state,
+                            &self.receiver_stats,
+                        );
+
+                    // 处理用户动作
+                    match action {
+                        UserAction::StartReceiver => {
+                            self.start_receiver();
+                        }
+                        UserAction::StopReceiver => {
+                            self.stop_receiver();
+                        }
+                        _ => {}
+                    }
                 }
             }
         });
@@ -752,8 +370,13 @@ impl eframe::App for DataTransferApp {
         _gl: Option<&eframe::glow::Context>,
     ) {
         // 应用退出时保存配置
-        if let Err(e) = self.config_manager.save() {
-            tracing::error!("Failed to save config file: {}", e);
+        if let Err(e) =
+            self.transfer_service.config_manager.save()
+        {
+            tracing::error!(
+                "Failed to save config file: {}",
+                e
+            );
         }
     }
 }
