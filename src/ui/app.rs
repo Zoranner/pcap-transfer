@@ -396,8 +396,7 @@ pub fn run_gui() -> Result<()> {
     let mut viewport_builder =
         egui::ViewportBuilder::default()
             .with_inner_size([400.0, 500.0])
-            .with_min_inner_size([400.0, 500.0])
-            .with_max_inner_size([400.0, 500.0])
+            .with_min_inner_size([300.0, 500.0])
             .with_resizable(true)
             .with_title("Pcap Transfer");
 

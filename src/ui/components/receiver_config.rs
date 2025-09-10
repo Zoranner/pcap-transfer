@@ -49,13 +49,13 @@ pub fn render_receiver_config(
             ui.end_row();
 
             ui.label("Dataset Name");
-            ui.text_edit_singleline(
-                &mut config.dataset_name,
-            );
+            ui.add(egui::TextEdit::singleline(&mut config.dataset_name)
+                .desired_width(f32::INFINITY));
             ui.end_row();
 
             ui.label("Listen Address");
-            ui.text_edit_singleline(&mut config.address);
+            ui.add(egui::TextEdit::singleline(&mut config.address)
+                .desired_width(f32::INFINITY));
             ui.end_row();
 
             ui.label("Listen Port");

@@ -49,7 +49,8 @@ pub fn render_sender_config(
             ui.end_row();
 
             ui.label("Target Address");
-            ui.text_edit_singleline(&mut config.address);
+            ui.add(egui::TextEdit::singleline(&mut config.address)
+                .desired_width(f32::INFINITY));
             ui.end_row();
 
             ui.label("Target Port");

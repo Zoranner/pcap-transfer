@@ -1,7 +1,6 @@
 //! 路径选择组件 - 包含输入框和浏览按钮的组合组件
 
 use eframe::egui;
-use egui_extras::{Size, StripBuilder};
 
 /// 路径选择组件
 /// 包含文本输入框和浏览按钮的组合
@@ -32,49 +31,34 @@ impl<'a> PathSelector<'a> {
 
 impl<'a> egui::Widget for PathSelector<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let mut text_response = None;
+        let button_width = 60.0;
+        let spacing = ui.spacing().item_spacing.x;
+        
+        // 根据可用空间确定实际宽度
+        let actual_width = ui.available_width();
+        let input_width = actual_width - button_width - spacing;
 
-        StripBuilder::new(ui)
-            .size(Size::remainder()) // 输入框占用剩余空间
-            .size(Size::exact(50.0)) // 按钮固定50px宽度
-            .horizontal(|mut strip| {
-                // 输入框
-                strip.cell(|ui| {
-                    let text_edit = if let Some(hint) =
-                        &self.hint_text
-                    {
-                        egui::TextEdit::singleline(
-                            self.path,
-                        )
-                        .hint_text(hint)
-                    } else {
-                        egui::TextEdit::singleline(
-                            self.path,
-                        )
-                    };
-                    text_response = Some(ui.add(text_edit));
-                });
+        ui.horizontal_centered(|ui| {
+            // 输入框
+            let text_edit = if let Some(hint) = &self.hint_text {
+                egui::TextEdit::singleline(self.path)
+                    .desired_width(input_width)
+                    .hint_text(hint)
+            } else {
+                egui::TextEdit::singleline(self.path)
+                    .desired_width(input_width)
+            };
+            
+            let text_response = ui.add(text_edit);
 
-                // 浏览按钮
-                strip.cell(|ui| {
-                    if ui.button("Browse").clicked() {
-                        if let Some(path) =
-                            rfd::FileDialog::new()
-                                .pick_folder()
-                        {
-                            *self.path = path
-                                .to_string_lossy()
-                                .to_string();
-                        }
-                    }
-                });
-            });
+            // 浏览按钮
+            if ui.button("Browse").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    *self.path = path.to_string_lossy().to_string();
+                }
+            }
 
-        text_response.unwrap_or_else(|| {
-            ui.allocate_response(
-                egui::Vec2::ZERO,
-                egui::Sense::hover(),
-            )
-        })
+            text_response
+        }).inner
     }
 }

@@ -48,7 +48,7 @@ impl AppRenderer {
         // 主内容区域：配置和控制区域 (占据剩余空间)
         egui::CentralPanel::default().show(ui.ctx(), |ui| {
             ui.vertical(|ui| {
-                ui.heading("Configuration Parameters");
+                ui.heading("Parameter Settings");
                 ui.separator();
                 ui.add_space(8.0);
 
@@ -87,7 +87,7 @@ impl AppRenderer {
         // 主内容区域：配置和控制区域 (占据剩余空间)
         egui::CentralPanel::default().show(ui.ctx(), |ui| {
             ui.vertical(|ui| {
-                ui.heading("Configuration Parameters");
+                ui.heading("Parameter Settings");
                 ui.separator();
                 ui.add_space(8.0);
 
