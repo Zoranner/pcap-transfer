@@ -383,13 +383,11 @@ impl eframe::App for DataTransferApp {
 
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
-    let viewport_builder =
-        egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 500.0])
-            .with_min_inner_size([300.0, 500.0])
-            .with_resizable(true)
-            .with_title("Pcap Transfer");
-
+    let viewport_builder = egui::ViewportBuilder::default()
+        .with_inner_size([400.0, 500.0])
+        .with_min_inner_size([300.0, 500.0])
+        .with_resizable(true)
+        .with_title("Pcap Transfer");
 
     let options = eframe::NativeOptions {
         viewport: viewport_builder,
