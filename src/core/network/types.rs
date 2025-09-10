@@ -3,8 +3,10 @@ use std::net::{IpAddr, SocketAddr};
 use tokio::net::UdpSocket as TokioUdpSocket;
 use tracing::{debug, warn};
 
-use crate::config::{NetworkConfig, NetworkType};
-use crate::error::{DataTransferError, Result};
+use crate::app::config::types::{
+    NetworkConfig, NetworkType,
+};
+use crate::app::error::types::{DataTransferError, Result};
 
 /// UDP套接字工厂
 pub struct UdpSocketFactory;

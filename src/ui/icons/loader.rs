@@ -7,27 +7,27 @@ use std::sync::Arc;
 /// 应用程序图标数据
 /// ICO格式包含多个分辨率，系统会自动选择合适的尺寸
 const ICON_ICO: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit.ico"
+    "../../../assets/icons/icons8_in_transit.ico"
 );
 
 /// PNG格式图标（作为备用方案）
 const ICON_16: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_16.png"
+    "../../../assets/icons/icons8_in_transit_16.png"
 );
 const ICON_32: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_32.png"
+    "../../../assets/icons/icons8_in_transit_32.png"
 );
 const ICON_48: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_48.png"
+    "../../../assets/icons/icons8_in_transit_48.png"
 );
 const ICON_64: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_64.png"
+    "../../../assets/icons/icons8_in_transit_64.png"
 );
 const ICON_128: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_128.png"
+    "../../../assets/icons/icons8_in_transit_128.png"
 );
 const ICON_256: &[u8] = include_bytes!(
-    "../../assets/icons/icons8_in_transit_256.png"
+    "../../../assets/icons/icons8_in_transit_256.png"
 );
 
 /// 创建应用程序图标数据

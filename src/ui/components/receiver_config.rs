@@ -1,8 +1,8 @@
-//! 发送器配置组件
+//! 接收器配置组件
 
-use super::super::config::SenderConfig;
+use super::super::config::ReceiverConfig;
 use super::PathSelector;
-use crate::config::NetworkType;
+use crate::app::config::types::NetworkType;
 use eframe::egui;
 
 /// 渲染网络类型选择组合框
@@ -31,28 +31,34 @@ fn render_network_type_combo(
         });
 }
 
-/// 渲染发送器配置区域
-pub fn render_sender_config(
+/// 渲染接收器配置区域
+pub fn render_receiver_config(
     ui: &mut egui::Ui,
-    config: &mut SenderConfig,
+    config: &mut ReceiverConfig,
 ) {
-    egui::Grid::new("sender_config")
+    egui::Grid::new("receiver_config")
         .num_columns(2)
         .min_col_width(80.0) // 标题列固定最小宽度
         .spacing([20.0, 4.0])
         .striped(true)
         .show(ui, |ui| {
-            ui.label("保存路径");
+            ui.label("输出路径");
             ui.add(PathSelector::new(
-                &mut config.dataset_path,
+                &mut config.output_path,
             ));
             ui.end_row();
 
-            ui.label("目标地址");
+            ui.label("数据名称");
+            ui.text_edit_singleline(
+                &mut config.dataset_name,
+            );
+            ui.end_row();
+
+            ui.label("监听地址");
             ui.text_edit_singleline(&mut config.address);
             ui.end_row();
 
-            ui.label("目标端口");
+            ui.label("监听端口");
             ui.add(
                 egui::DragValue::new(&mut config.port)
                     .range(1..=65535),

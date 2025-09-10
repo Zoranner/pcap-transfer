@@ -2,7 +2,7 @@
 //!
 //! 包含状态指示器、状态标签按钮等与状态显示相关的组件。
 
-use crate::sender::TransferState;
+use crate::core::network::sender::TransferState;
 use eframe::egui;
 
 /// 状态标签按钮组件
@@ -63,11 +63,7 @@ impl StatusTabButton {
             4.0,
             bg_color,
         );
-        ui.painter().rect_stroke(
-            button_rect,
-            4.0,
-            stroke,
-        );
+        ui.painter().rect_stroke(button_rect, 4.0, stroke);
 
         // 绘制按钮文本
         let text_color = if self.is_selected {

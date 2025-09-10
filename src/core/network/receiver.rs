@@ -1,10 +1,12 @@
 //! 接收器模块 - 处理数据包接收逻辑
 
-use crate::config::{NetworkType, ReceiverAppConfig};
-use crate::error::Result;
-use crate::network::UdpSocketFactory;
-use crate::sender::TransferState;
-use crate::stats::TransferStats;
+use crate::app::config::types::{
+    NetworkType, ReceiverAppConfig,
+};
+use crate::app::error::types::Result;
+use crate::core::network::sender::TransferState;
+use crate::core::network::types::UdpSocketFactory;
+use crate::core::stats::collector::TransferStats;
 use chrono::Utc;
 use pcapfile_io::{DataPacket, PcapWriter, WriterConfig};
 use std::path::PathBuf;

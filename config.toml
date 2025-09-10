@@ -9,7 +9,7 @@ interface = ""
 
 [receiver]
 output_path = "./output"
-dataset_name = "received_data2"
+dataset_name = "received_data"
 buffer_size = 1048576
 
 [receiver.network]

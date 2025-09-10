@@ -4,9 +4,9 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
 
-use crate::config::NetworkType;
+use super::paths::ConfigPaths;
+use super::types::NetworkType;
 
 /// 应用程序配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -92,47 +92,64 @@ impl Default for LoggingConfig {
 
 /// 配置管理器
 pub struct ConfigManager {
-    config_path: PathBuf,
+    config_paths: ConfigPaths,
     config: AppConfig,
 }
 
 impl ConfigManager {
     /// 创建新的配置管理器
-    pub fn new<P: AsRef<Path>>(config_path: P) -> Self {
-        Self {
-            config_path: config_path.as_ref().to_path_buf(),
+    ///
+    /// # 参数
+    /// * `project_name` - 项目名称，用于构建配置目录路径
+    ///
+    /// # 返回
+    /// 返回配置管理器实例，如果路径创建失败则返回错误
+    ///
+    /// # 示例
+    /// ```
+    /// let config_manager = ConfigManager::new("pcap-transfer")?;
+    /// ```
+    pub fn new(project_name: &str) -> Result<Self> {
+        let config_paths = ConfigPaths::new(project_name)?;
+
+        Ok(Self {
+            config_paths,
             config: AppConfig::default(),
-        }
+        })
     }
 
     /// 加载配置文件
     pub fn load(&mut self) -> Result<()> {
-        if self.config_path.exists() {
-            let content =
-                fs::read_to_string(&self.config_path)
-                    .with_context(|| {
-                        format!(
-                            "无法读取配置文件: {:?}",
-                            self.config_path
-                        )
-                    })?;
+        // 确保配置目录存在
+        self.config_paths.ensure_config_dir_exists()?;
+
+        let config_file = self.config_paths.config_file();
+
+        if config_file.exists() {
+            let content = fs::read_to_string(config_file)
+                .with_context(|| {
+                format!(
+                    "无法读取配置文件: {:?}",
+                    config_file
+                )
+            })?;
 
             self.config = toml::from_str(&content)
                 .with_context(|| {
                     format!(
                         "无法解析配置文件: {:?}",
-                        self.config_path
+                        config_file
                     )
                 })?;
 
             tracing::info!(
                 "配置文件加载成功: {:?}",
-                self.config_path
+                config_file
             );
         } else {
             tracing::info!(
                 "配置文件不存在，使用默认配置: {:?}",
-                self.config_path
+                config_file
             );
             self.save()?; // 创建默认配置文件
         }
@@ -141,32 +158,25 @@ impl ConfigManager {
 
     /// 保存配置文件
     pub fn save(&self) -> Result<()> {
-        // 确保父目录存在
-        if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent).with_context(
-                || {
-                    format!(
-                        "无法创建配置目录: {:?}",
-                        parent
-                    )
-                },
-            )?;
-        }
+        // 确保配置目录存在
+        self.config_paths.ensure_config_dir_exists()?;
 
         let content = toml::to_string_pretty(&self.config)
             .context("无法序列化配置")?;
 
-        fs::write(&self.config_path, content)
-            .with_context(|| {
+        let config_file = self.config_paths.config_file();
+        fs::write(config_file, content).with_context(
+            || {
                 format!(
                     "无法写入配置文件: {:?}",
-                    self.config_path
+                    config_file
                 )
-            })?;
+            },
+        )?;
 
         tracing::info!(
             "配置文件保存成功: {:?}",
-            self.config_path
+            config_file
         );
         Ok(())
     }

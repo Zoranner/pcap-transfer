@@ -1,8 +1,8 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use crate::error::Result;
-use crate::utils::{
+use crate::app::error::types::Result;
+use crate::utils::helpers::{
     ensure_output_directory, is_broadcast_address,
     is_multicast_address, validate_dataset_path,
     validate_ip_address, validate_port,
@@ -192,7 +192,7 @@ fn validate_network_config_by_ip(
         }
         NetworkType::Multicast => {
             if !is_multicast_address(ip_addr) {
-                return Err(crate::error::DataTransferError::validation(
+                return Err(crate::app::error::types::DataTransferError::validation(
                     "地址",
                     format!("地址{ip_addr}不是有效的组播地址"),
                 ));

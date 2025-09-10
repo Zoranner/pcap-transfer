@@ -1,10 +1,12 @@
 //! 发送器模块 - 处理数据包发送逻辑
 
-use crate::config::{NetworkType, SenderAppConfig};
-use crate::error::Result;
-use crate::network::UdpSocketFactory;
-use crate::stats::TransferStats;
-use crate::timing::TimingController;
+use crate::app::config::types::{
+    NetworkType, SenderAppConfig,
+};
+use crate::app::error::types::Result;
+use crate::core::network::types::UdpSocketFactory;
+use crate::core::stats::collector::TransferStats;
+use crate::core::timing::utils::TimingController;
 use pcapfile_io::{PcapReader, ReaderConfig};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

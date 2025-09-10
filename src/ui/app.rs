@@ -4,18 +4,19 @@ use eframe::egui;
 use std::sync::{Arc, Mutex};
 use tracing;
 
-use crate::config_manager::ConfigManager;
-use crate::error::{AppError, Result};
-use crate::receiver::run_receiver_with_gui_stats;
-use crate::sender::{
+use crate::app::config::manager::ConfigManager;
+use crate::app::error::types::{AppError, Result};
+use crate::core::network::receiver::run_receiver_with_gui_stats;
+use crate::core::network::sender::{
     run_sender_with_gui_stats, TransferState,
 };
-use crate::stats::TransferStats;
+use crate::core::stats::collector::TransferStats;
 
 use super::config::{
     ReceiverConfig, SelectedTab, SenderConfig,
 };
-use super::{components, font, widgets};
+use super::fonts::loader;
+use super::{components, widgets};
 
 /// GUI 应用程序
 pub struct DataTransferApp {
@@ -40,7 +41,15 @@ pub struct DataTransferApp {
 impl Default for DataTransferApp {
     fn default() -> Self {
         let mut config_manager =
-            ConfigManager::new("config.toml");
+            ConfigManager::new("pcap-transfer")
+                .unwrap_or_else(|e| {
+                    tracing::error!(
+                        "创建配置管理器失败: {}",
+                        e
+                    );
+                    panic!("无法创建配置管理器: {}", e);
+                });
+
         // 尝试加载配置，如果失败则使用默认配置
         if let Err(e) = config_manager.load() {
             tracing::warn!(
@@ -132,7 +141,7 @@ impl Default for DataTransferApp {
 impl DataTransferApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // 配置跨平台的中文字体支持
-        font::setup_fonts(&cc.egui_ctx);
+        loader::setup_fonts(&cc.egui_ctx);
         Self::default()
     }
 
@@ -674,7 +683,7 @@ impl eframe::App for DataTransferApp {
                             egui::Align::Center,
                         ),
                         |ui| {
-                            if widgets::StatusTabButton::new(
+                            if widgets::status::StatusTabButton::new(
                                 "发送器",
                                 self.sender_transfer_state
                                     .clone(),
@@ -700,7 +709,7 @@ impl eframe::App for DataTransferApp {
                             egui::Align::Center,
                         ),
                         |ui| {
-                            if widgets::StatusTabButton::new(
+                            if widgets::status::StatusTabButton::new(
                                 "接收器",
                                 self.receiver_transfer_state
                                     .clone(),
@@ -752,13 +761,14 @@ impl eframe::App for DataTransferApp {
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
     // 加载应用程序图标
-    let icon_data = match super::icon::create_icon_data() {
-        Ok(icon) => Some(icon),
-        Err(e) => {
-            eprintln!("Warning: Failed to load application icon: {}", e);
-            None
-        }
-    };
+    let icon_data =
+        match super::icons::loader::create_icon_data() {
+            Ok(icon) => Some(icon),
+            Err(e) => {
+                eprintln!("Warning: Failed to load application icon: {}", e);
+                None
+            }
+        };
 
     let mut viewport_builder =
         egui::ViewportBuilder::default()

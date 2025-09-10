@@ -15,8 +15,7 @@ pub fn setup_fonts(ctx: &egui::Context) {
         {
             fonts.font_data.insert(
                 "chinese_font".to_owned(),
-                egui::FontData::from_owned(font_data)
-                    .into(),
+                egui::FontData::from_owned(font_data),
             );
         }
     }

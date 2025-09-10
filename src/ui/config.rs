@@ -2,7 +2,7 @@
 //!
 //! 定义GUI应用程序的配置结构体和枚举类型。
 
-use crate::config::NetworkType;
+use crate::app::config::types::NetworkType;
 
 /// 当前选中的标签页
 #[derive(Debug, Clone, PartialEq)]

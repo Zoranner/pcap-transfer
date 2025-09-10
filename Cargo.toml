@@ -33,6 +33,7 @@ toml = "0.8"
 
 # 文件系统
 path-absolutize = "3.1"
+dirs = "5.0"
 
 # GUI 界面
 egui = "0.28"

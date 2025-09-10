@@ -1,6 +1,7 @@
 //! 统计信息组件
 
-use crate::stats::TransferStats;
+use crate::core::stats::collector::TransferStats;
+use crate::utils::helpers::format_bytes;
 use eframe::egui;
 
 /// 渲染统计信息
@@ -44,7 +45,7 @@ pub fn render_stats(
                     egui::Align::Center,
                 ),
                 |ui| {
-                    ui.label(crate::utils::format_bytes(
+                    ui.label(format_bytes(
                         stats.get_bytes_processed(),
                     ));
                     ui.allocate_response(
@@ -69,7 +70,7 @@ pub fn render_stats(
                     {
                         ui.label(format!(
                             "{}/s",
-                            crate::utils::format_bytes(
+                            format_bytes(
                                 packet_rate as u64 / 8
                             )
                         ));
