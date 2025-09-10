@@ -16,7 +16,7 @@ pub fn render_stats(
         .spacing([20.0, 4.0])
         .striped(true)
         .show(ui, |ui| {
-            ui.label("传输包数");
+            ui.label("Packets Transferred");
             // 让数值列占用剩余空间
             ui.with_layout(
                 egui::Layout::left_to_right(
@@ -39,7 +39,7 @@ pub fn render_stats(
             );
             ui.end_row();
 
-            ui.label("传输字节");
+            ui.label("Bytes Transferred");
             ui.with_layout(
                 egui::Layout::left_to_right(
                     egui::Align::Center,
@@ -59,7 +59,7 @@ pub fn render_stats(
             );
             ui.end_row();
 
-            ui.label("数据速率");
+            ui.label("Data Rate");
             ui.with_layout(
                 egui::Layout::left_to_right(
                     egui::Align::Center,
@@ -75,7 +75,7 @@ pub fn render_stats(
                             )
                         ));
                     } else {
-                        ui.label("未知".to_string());
+                        ui.label("Unknown".to_string());
                     }
                     ui.allocate_response(
                         egui::Vec2::new(
@@ -88,7 +88,7 @@ pub fn render_stats(
             );
             ui.end_row();
 
-            ui.label("持续时间");
+            ui.label("Duration");
             ui.with_layout(
                 egui::Layout::left_to_right(
                     egui::Align::Center,
@@ -102,7 +102,7 @@ pub fn render_stats(
                             packet_duration.as_secs_f64()
                         ));
                     } else {
-                        ui.label("未知".to_string());
+                        ui.label("Unknown".to_string());
                     }
                     ui.allocate_response(
                         egui::Vec2::new(
@@ -115,7 +115,7 @@ pub fn render_stats(
             );
             ui.end_row();
 
-            ui.label("错误数量");
+            ui.label("Error Count");
             ui.with_layout(
                 egui::Layout::left_to_right(
                     egui::Align::Center,

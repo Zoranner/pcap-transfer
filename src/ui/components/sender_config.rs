@@ -42,24 +42,24 @@ pub fn render_sender_config(
         .spacing([20.0, 4.0])
         .striped(true)
         .show(ui, |ui| {
-            ui.label("保存路径");
+            ui.label("Save Path");
             ui.add(PathSelector::new(
                 &mut config.dataset_path,
             ));
             ui.end_row();
 
-            ui.label("目标地址");
+            ui.label("Target Address");
             ui.text_edit_singleline(&mut config.address);
             ui.end_row();
 
-            ui.label("目标端口");
+            ui.label("Target Port");
             ui.add(
                 egui::DragValue::new(&mut config.port)
                     .range(1..=65535),
             );
             ui.end_row();
 
-            ui.label("网络类型");
+            ui.label("Network Type");
             render_network_type_combo(
                 ui,
                 &mut config.network_type,

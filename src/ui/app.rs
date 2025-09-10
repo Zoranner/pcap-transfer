@@ -44,16 +44,16 @@ impl Default for DataTransferApp {
             ConfigManager::new("pcap-transfer")
                 .unwrap_or_else(|e| {
                     tracing::error!(
-                        "创建配置管理器失败: {}",
+                        "Failed to create config manager: {}",
                         e
                     );
-                    panic!("无法创建配置管理器: {}", e);
+                    panic!("Unable to create config manager: {}", e);
                 });
 
         // 尝试加载配置，如果失败则使用默认配置
         if let Err(e) = config_manager.load() {
             tracing::warn!(
-                "加载配置文件失败，使用默认配置: {}",
+                "Failed to load config file, using default config: {}",
                 e
             );
         }
@@ -154,7 +154,7 @@ impl DataTransferApp {
             .show(ui.ctx(), |ui| {
                 ui.vertical(|ui| {
                     ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
-                    ui.heading("传输统计");
+                    ui.heading("Transfer Statistics");
                     ui.separator();
                     ui.add_space(8.0);
                     self.render_sender_stats_safely(ui);
@@ -166,7 +166,7 @@ impl DataTransferApp {
             ui.ctx(),
             |ui| {
                 ui.vertical(|ui| {
-                    ui.heading("配置参数");
+                    ui.heading("Configuration Parameters");
                     ui.separator();
                     ui.add_space(8.0);
 
@@ -195,14 +195,14 @@ impl DataTransferApp {
                     ui.horizontal(|ui| {
                         if can_start
                             && ui
-                                .button("开始发送")
+                                .button("Start Sending")
                                 .clicked()
                         {
                             self.start_sender();
                         }
                         if can_stop
                             && ui
-                                .button("停止发送")
+                                .button("Stop Sending")
                                 .clicked()
                         {
                             self.stop_sender();
@@ -212,14 +212,14 @@ impl DataTransferApp {
                             TransferState::Completed => {
                                 ui.colored_label(
                                     egui::Color32::GRAY,
-                                    "发送完成",
+                                    "Send Completed",
                                 );
                             }
                             TransferState::Error(err) => {
                                 ui.colored_label(
                                     egui::Color32::RED,
                                     format!(
-                                        "错误: {}",
+                                        "Error: {}",
                                         err
                                     ),
                                 );
@@ -243,7 +243,7 @@ impl DataTransferApp {
         .show(ui.ctx(), |ui| {
             ui.vertical(|ui| {
                 ui.add_space(8.0); // 补偿TopBottomPanel的默认内边距
-                ui.heading("传输统计");
+                ui.heading("Transfer Statistics");
                 ui.separator();
                 ui.add_space(8.0);
                 self.render_receiver_stats_safely(ui);
@@ -255,7 +255,7 @@ impl DataTransferApp {
             ui.ctx(),
             |ui| {
                 ui.vertical(|ui| {
-                    ui.heading("配置参数");
+                    ui.heading("Configuration Parameters");
                     ui.separator();
                     ui.add_space(8.0);
 
@@ -285,14 +285,14 @@ impl DataTransferApp {
                     ui.horizontal(|ui| {
                         if can_start
                             && ui
-                                .button("开始接收")
+                                .button("Start Receiving")
                                 .clicked()
                         {
                             self.start_receiver();
                         }
                         if can_stop
                             && ui
-                                .button("停止接收")
+                                .button("Stop Receiving")
                                 .clicked()
                         {
                             self.stop_receiver();
@@ -302,14 +302,14 @@ impl DataTransferApp {
                             TransferState::Completed => {
                                 ui.colored_label(
                                     egui::Color32::GRAY,
-                                    "接收完成",
+                                    "Receive Completed",
                                 );
                             }
                             TransferState::Error(err) => {
                                 ui.colored_label(
                                     egui::Color32::RED,
                                     format!(
-                                        "错误: {}",
+                                        "Error: {}",
                                         err
                                     ),
                                 );
@@ -369,7 +369,7 @@ impl DataTransferApp {
             self.sender_config.dataset_path.clone(),
         );
         if let Err(e) = self.config_manager.save() {
-            tracing::warn!("保存配置失败: {}", e);
+            tracing::warn!("Failed to save config: {}", e);
         }
 
         let dataset_path = std::path::PathBuf::from(
@@ -386,10 +386,10 @@ impl DataTransferApp {
         if let Ok(mut stats_guard) = stats.lock() {
             *stats_guard = TransferStats::default();
         } else {
-            tracing::error!("无法获取统计信息锁");
+            tracing::error!("Unable to acquire statistics lock");
             self.sender_transfer_state =
                 TransferState::Error(
-                    "统计信息初始化失败".to_string(),
+                    "Statistics initialization failed".to_string(),
                 );
             return;
         }
@@ -421,11 +421,11 @@ impl DataTransferApp {
                 .await
                 {
                     Ok(_) => {
-                        tracing::info!("发送任务完成");
+                        tracing::info!("Send task completed");
                     }
                     Err(e) => {
                         tracing::error!(
-                            "发送任务失败: {}",
+                            "Send task failed: {}",
                             e
                         );
                         if let Ok(mut state) =
@@ -441,7 +441,7 @@ impl DataTransferApp {
         } else {
             self.sender_transfer_state =
                 TransferState::Error(
-                    "运行时句柄未初始化".to_string(),
+                    "Runtime handle not initialized".to_string(),
                 );
         }
     }
@@ -449,7 +449,7 @@ impl DataTransferApp {
     /// 启动接收器
     fn start_receiver(&mut self) {
         if let Err(e) = self.validate_receiver_config() {
-            tracing::error!("接收器配置验证失败: {}", e);
+            tracing::error!("Receiver config validation failed: {}", e);
             self.receiver_transfer_state =
                 TransferState::Error(e.to_string());
             return;
@@ -467,7 +467,7 @@ impl DataTransferApp {
             self.receiver_config.dataset_name.clone(),
         );
         if let Err(e) = self.config_manager.save() {
-            tracing::warn!("保存配置失败: {}", e);
+            tracing::warn!("Failed to save config: {}", e);
         }
 
         // 获取当前的 Tokio runtime handle
@@ -476,11 +476,11 @@ impl DataTransferApp {
                 Ok(h) => h,
                 Err(_) => {
                     tracing::error!(
-                        "无法获取 Tokio runtime handle"
+                        "Unable to get Tokio runtime handle"
                     );
                     self.receiver_transfer_state =
                         TransferState::Error(
-                            "运行时句柄未初始化"
+                            "Runtime handle not initialized"
                                 .to_string(),
                         );
                     return;
@@ -538,11 +538,11 @@ impl DataTransferApp {
                 .await
                 {
                     Ok(_) => {
-                        tracing::info!("接收任务完成");
+                        tracing::info!("Receive task completed");
                     }
                     Err(e) => {
                         tracing::error!(
-                            "接收任务失败: {}",
+                            "Receive task failed: {}",
                             e
                         );
                         if let Ok(mut state) =
@@ -558,7 +558,7 @@ impl DataTransferApp {
         } else {
             self.receiver_transfer_state =
                 TransferState::Error(
-                    "运行时句柄未初始化".to_string(),
+                    "Runtime handle not initialized".to_string(),
                 );
         }
     }
@@ -591,8 +591,8 @@ impl DataTransferApp {
     fn validate_sender_config(&self) -> Result<()> {
         if self.sender_config.dataset_path.is_empty() {
             return Err(AppError::validation(
-                "数据集路径",
-                "路径不能为空",
+                "Dataset Path",
+                "Path cannot be empty",
             ));
         }
 
@@ -601,15 +601,15 @@ impl DataTransferApp {
         );
         if !dataset_path.exists() {
             return Err(AppError::validation(
-                "数据集路径",
-                "路径不存在",
+                "Dataset Path",
+                "Path does not exist",
             ));
         }
 
         if self.sender_config.address.is_empty() {
             return Err(AppError::validation(
-                "目标地址",
-                "地址不能为空",
+                "Target Address",
+                "Address cannot be empty",
             ));
         }
 
@@ -620,22 +620,22 @@ impl DataTransferApp {
     fn validate_receiver_config(&self) -> Result<()> {
         if self.receiver_config.output_path.is_empty() {
             return Err(AppError::validation(
-                "输出路径",
-                "路径不能为空",
+                "Output Path",
+                "Path cannot be empty",
             ));
         }
 
         if self.receiver_config.dataset_name.is_empty() {
             return Err(AppError::validation(
-                "数据集名称",
-                "名称不能为空",
+                "Dataset Name",
+                "Name cannot be empty",
             ));
         }
 
         if self.receiver_config.address.is_empty() {
             return Err(AppError::validation(
-                "监听地址",
-                "地址不能为空",
+                "Listen Address",
+                "Address cannot be empty",
             ));
         }
 
@@ -684,7 +684,7 @@ impl eframe::App for DataTransferApp {
                         ),
                         |ui| {
                             if widgets::status::StatusTabButton::new(
-                                "发送器",
+                                "Sender",
                                 self.sender_transfer_state
                                     .clone(),
                                 self.selected_tab
@@ -710,7 +710,7 @@ impl eframe::App for DataTransferApp {
                         ),
                         |ui| {
                             if widgets::status::StatusTabButton::new(
-                                "接收器",
+                                "Receiver",
                                 self.receiver_transfer_state
                                     .clone(),
                                 self.selected_tab
@@ -753,7 +753,7 @@ impl eframe::App for DataTransferApp {
     ) {
         // 应用退出时保存配置
         if let Err(e) = self.config_manager.save() {
-            tracing::error!("保存配置文件失败: {}", e);
+            tracing::error!("Failed to save config file: {}", e);
         }
     }
 }
@@ -804,7 +804,7 @@ pub fn run_gui() -> Result<()> {
         }),
     )
     .map_err(|e| {
-        tracing::error!("GUI启动失败: {}", e);
+        tracing::error!("GUI startup failed: {}", e);
         AppError::Gui(e.to_string())
     })?;
 

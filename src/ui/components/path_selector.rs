@@ -57,7 +57,7 @@ impl<'a> egui::Widget for PathSelector<'a> {
 
                 // 浏览按钮
                 strip.cell(|ui| {
-                    if ui.button("浏览").clicked() {
+                    if ui.button("Browse").clicked() {
                         if let Some(path) =
                             rfd::FileDialog::new()
                                 .pick_folder()

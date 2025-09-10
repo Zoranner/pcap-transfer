@@ -6,27 +6,27 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum DataTransferError {
     /// 网络相关错误
-    #[error("网络错误: {0}")]
+    #[error("Network error: {0}")]
     Network(#[from] io::Error),
 
     /// 配置错误
-    #[error("配置错误: {message}")]
+    #[error("Configuration error: {message}")]
     Config { message: String },
 
     /// IP地址解析错误
-    #[error("IP地址格式错误: {0}")]
+    #[error("Invalid IP address format: {0}")]
     IpAddress(#[from] AddrParseError),
 
     /// pcapfile-io 库错误
-    #[error("PCAP文件处理错误: {0}")]
+    #[error("PCAP file processing error: {0}")]
     PcapIo(#[from] pcapfile_io::PcapError),
 
     /// 验证错误
-    #[error("验证失败: {field} - {message}")]
+    #[error("Validation failed: {field} - {message}")]
     Validation { field: String, message: String },
 
     /// GUI 相关错误
-    #[error("GUI错误: {0}")]
+    #[error("GUI error: {0}")]
     Gui(String),
 }
 
