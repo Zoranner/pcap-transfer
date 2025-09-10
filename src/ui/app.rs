@@ -383,27 +383,13 @@ impl eframe::App for DataTransferApp {
 
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
-    // 加载应用程序图标
-    let icon_data =
-        match super::icons::loader::create_icon_data() {
-            Ok(icon) => Some(icon),
-            Err(e) => {
-                eprintln!("Warning: Failed to load application icon: {}", e);
-                None
-            }
-        };
-
-    let mut viewport_builder =
+    let viewport_builder =
         egui::ViewportBuilder::default()
             .with_inner_size([400.0, 500.0])
             .with_min_inner_size([300.0, 500.0])
             .with_resizable(true)
             .with_title("Pcap Transfer");
 
-    // 如果图标加载成功，则设置图标
-    if let Some(icon) = icon_data {
-        viewport_builder = viewport_builder.with_icon(icon);
-    }
 
     let options = eframe::NativeOptions {
         viewport: viewport_builder,

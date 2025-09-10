@@ -5,7 +5,6 @@ pub mod app_state;
 pub mod components;
 pub mod config;
 pub mod fonts;
-pub mod icons;
 pub mod widgets;
 
 use crate::app::error::types::Result;

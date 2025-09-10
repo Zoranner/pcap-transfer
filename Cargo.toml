@@ -43,8 +43,6 @@ eframe = { version = "0.28", default-features = false, features = [
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 rfd = "0.14" # 文件对话框
-egui_extras = "0.28"
-image = { version = "0.25.8", features = ["png", "ico"] }
 
 [features]
 default = []
