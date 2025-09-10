@@ -67,7 +67,6 @@ impl StatusTabButton {
             button_rect,
             4.0,
             stroke,
-            egui::epaint::StrokeKind::Outside,
         );
 
         // 绘制按钮文本
