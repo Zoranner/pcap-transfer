@@ -45,13 +45,13 @@ impl ConfigPaths {
             std::fs::create_dir_all(&self.config_dir)
                 .with_context(|| {
                     format!(
-                        "无法创建配置目录: {:?}",
+                        "Failed to create config directory: {:?}",
                         self.config_dir
                     )
                 })?;
 
             tracing::info!(
-                "创建配置目录: {:?}",
+                "Created config directory: {:?}",
                 self.config_dir
             );
         }
@@ -74,7 +74,7 @@ impl ConfigPaths {
                     .map(|home| home.join(".config"))
             })
             .ok_or_else(|| {
-                anyhow::anyhow!("无法确定用户配置目录")
+                anyhow::anyhow!("Unable to determine user config directory")
             })?;
 
         // 构建完整的配置目录路径
@@ -94,7 +94,7 @@ impl ConfigPaths {
         };
 
         tracing::info!(
-            "配置目录路径: {:?} (平台: {})",
+            "Config directory path: {:?} (platform: {})",
             config_dir,
             std::env::consts::OS
         );

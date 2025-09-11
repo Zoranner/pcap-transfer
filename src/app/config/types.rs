@@ -185,7 +185,7 @@ fn validate_network_config_by_ip(
         NetworkType::Broadcast => {
             if !is_broadcast_address(ip_addr) {
                 tracing::warn!(
-                    "地址{}可能不是有效的广播地址",
+                    "Address {} may not be a valid broadcast address",
                     ip_addr
                 );
             }
@@ -193,8 +193,8 @@ fn validate_network_config_by_ip(
         NetworkType::Multicast => {
             if !is_multicast_address(ip_addr) {
                 return Err(crate::app::error::types::DataTransferError::validation(
-                    "地址",
-                    format!("地址{ip_addr}不是有效的组播地址"),
+                    "Address",
+                    format!("Address {ip_addr} is not a valid multicast address"),
                 ));
             }
         }
@@ -203,7 +203,7 @@ fn validate_network_config_by_ip(
                 || is_multicast_address(ip_addr)
             {
                 tracing::warn!(
-                    "单播模式使用了特殊地址: {}",
+                    "Unicast mode using special address: {}",
                     ip_addr
                 );
             }

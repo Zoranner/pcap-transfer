@@ -86,7 +86,7 @@ pub async fn run_receiver_with_gui_stats(
                     Ok(packet) => {
                         // 写入数据包
                         if let Err(e) = writer.write_packet(&packet) {
-                            error!("写入数据包失败: {}", e);
+                            error!("Failed to write packet: {}", e);
                             errors_count += 1;
                             if errors_count >= error_batch_size {
                                 if let Ok(mut stats_guard) = stats.lock() {
@@ -116,7 +116,7 @@ pub async fn run_receiver_with_gui_stats(
                         }
                     }
                     Err(e) => {
-                        error!("创建数据包失败: {}", e);
+                        error!("Failed to create packet: {}", e);
                         errors_count += 1;
                         if errors_count >= error_batch_size {
                             if let Ok(mut stats_guard) = stats.lock() {
@@ -130,7 +130,7 @@ pub async fn run_receiver_with_gui_stats(
                 }
                     }
                     Err(e) => {
-                        error!("接收数据包失败: {}", e);
+                        error!("Failed to receive packet: {}", e);
                         errors_count += 1;
                         if errors_count >= error_batch_size {
                             if let Ok(mut stats_guard) = stats.lock() {

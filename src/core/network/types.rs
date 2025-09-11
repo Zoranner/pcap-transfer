@@ -48,7 +48,7 @@ async fn create_udp_sender_socket(
     };
 
     debug!(
-        "创建UDP发送器: 绑定={}, 目标={}",
+        "Creating UDP sender: bind={}, target={}",
         bind_addr, target_addr
     );
 
@@ -56,7 +56,7 @@ async fn create_udp_sender_socket(
         .await
         .map_err(|e| {
             DataTransferError::network(format!(
-                "绑定UDP发送器失败 {bind_addr}: {e}"
+                "Failed to bind UDP sender {bind_addr}: {e}"
             ))
         })?;
 
@@ -71,13 +71,13 @@ async fn create_udp_receiver_socket(
     let bind_addr =
         SocketAddr::new(config.address, config.port);
 
-    debug!("创建UDP接收器: 绑定={}", bind_addr);
+    debug!("Creating UDP receiver: bind={}", bind_addr);
 
     let socket = TokioUdpSocket::bind(bind_addr)
         .await
         .map_err(|e| {
             DataTransferError::network(format!(
-                "绑定UDP接收器失败 {bind_addr}: {e}"
+                "Failed to bind UDP receiver {bind_addr}: {e}"
             ))
         })?;
 
@@ -98,12 +98,12 @@ async fn configure_sender_socket(
             std_socket.set_broadcast(true).map_err(
                 |e| {
                     DataTransferError::config(format!(
-                        "设置广播选项失败: {e}"
+                        "Failed to set broadcast option: {e}"
                     ))
                 },
             )?;
 
-            debug!("UDP广播模式已启用");
+            debug!("UDP broadcast mode enabled");
             Ok(TokioUdpSocket::from_std(std_socket)
                 .map_err(DataTransferError::Network)?)
         }
@@ -119,7 +119,7 @@ async fn configure_sender_socket(
                     &config.interface
                 {
                     warn!(
-                        "组播接口配置需要手动实现: {}",
+                        "Multicast interface configuration requires manual implementation: {}",
                         interface_name
                     );
                 }
@@ -129,25 +129,25 @@ async fn configure_sender_socket(
                     .set_multicast_ttl_v4(32)
                     .map_err(|e| {
                         DataTransferError::config(format!(
-                            "设置组播TTL失败: {e}"
+                            "Failed to set multicast TTL: {e}"
                         ))
                     })?;
 
                 debug!(
-                    "IPv4组播发送器已配置: {}",
+                    "IPv4 multicast sender configured: {}",
                     multicast_addr
                 );
             } else if let IpAddr::V6(_multicast_addr) =
                 config.address
             {
-                warn!("暂不支持IPv6组播");
+                warn!("IPv6 multicast not supported yet");
             }
 
             Ok(TokioUdpSocket::from_std(std_socket)
                 .map_err(DataTransferError::Network)?)
         }
         NetworkType::Unicast => {
-            debug!("UDP单播发送器已创建");
+            debug!("UDP unicast sender created");
             Ok(socket)
         }
     }
@@ -168,7 +168,7 @@ async fn configure_receiver_socket(
     if let Err(e) =
         socket2.set_recv_buffer_size(2 * 1024 * 1024)
     {
-        warn!("设置接收缓冲区大小失败: {}", e);
+        warn!("Failed to set receive buffer size: {}", e);
     }
     let std_socket: std::net::UdpSocket = socket2.into();
 
@@ -177,11 +177,11 @@ async fn configure_receiver_socket(
             std_socket.set_broadcast(true).map_err(
                 |e| {
                     DataTransferError::config(format!(
-                        "设置广播选项失败: {e}"
+                        "Failed to set broadcast option: {e}"
                     ))
                 },
             )?;
-            debug!("UDP广播接收模式已启用");
+            debug!("UDP broadcast receive mode enabled");
         }
         NetworkType::Multicast => {
             if let IpAddr::V4(multicast_addr) =
@@ -193,21 +193,21 @@ async fn configure_receiver_socket(
                 std_socket
                     .join_multicast_v4(&multicast_addr, &interface_addr)
                     .map_err(|e| {
-                        DataTransferError::network(format!("加入组播组失败 {multicast_addr}: {e}"))
+                        DataTransferError::network(format!("Failed to join multicast group {multicast_addr}: {e}"))
                     })?;
 
                 debug!(
-                    "已加入IPv4组播组: {}",
+                    "Joined IPv4 multicast group: {}",
                     multicast_addr
                 );
             } else if let IpAddr::V6(_multicast_addr) =
                 config.address
             {
-                warn!("暂不支持IPv6组播");
+                warn!("IPv6 multicast not supported yet");
             }
         }
         NetworkType::Unicast => {
-            debug!("UDP单播接收器已创建");
+            debug!("UDP unicast receiver created");
         }
     }
 

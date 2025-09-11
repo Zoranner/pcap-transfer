@@ -7,14 +7,14 @@ pub fn validate_ip_address(
     address: &str,
 ) -> Result<IpAddr> {
     address.parse().with_context(|| {
-        format!("无效的IP地址格式: {address}")
+        format!("Invalid IP address format: {address}")
     })
 }
 
 /// 验证端口范围
 pub fn validate_port(port: u16) -> Result<u16> {
     if port == 0 {
-        anyhow::bail!("端口号不能为0");
+        anyhow::bail!("Port number cannot be 0");
     }
     Ok(port)
 }
@@ -23,14 +23,14 @@ pub fn validate_port(port: u16) -> Result<u16> {
 pub fn validate_dataset_path(path: &Path) -> Result<()> {
     if !path.exists() {
         anyhow::bail!(
-            "数据集路径不存在: {}",
+            "Dataset path does not exist: {}",
             path.display()
         );
     }
 
     if !path.is_dir() {
         anyhow::bail!(
-            "数据集路径必须是目录: {}",
+            "Dataset path must be a directory: {}",
             path.display()
         );
     }
@@ -44,7 +44,7 @@ pub fn ensure_output_directory(path: &Path) -> Result<()> {
         std::fs::create_dir_all(path).with_context(
             || {
                 format!(
-                    "创建输出目录失败: {}",
+                    "Failed to create output directory: {}",
                     path.display()
                 )
             },
@@ -53,7 +53,7 @@ pub fn ensure_output_directory(path: &Path) -> Result<()> {
 
     if !path.is_dir() {
         anyhow::bail!(
-            "输出路径必须是目录: {}",
+            "Output path must be a directory: {}",
             path.display()
         );
     }

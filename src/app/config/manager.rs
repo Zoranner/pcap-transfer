@@ -110,7 +110,7 @@ impl ConfigManager {
             let content = fs::read_to_string(config_file)
                 .with_context(|| {
                 format!(
-                    "无法读取配置文件: {:?}",
+                    "Failed to read config file: {:?}",
                     config_file
                 )
             })?;
@@ -118,18 +118,18 @@ impl ConfigManager {
             self.config = toml::from_str(&content)
                 .with_context(|| {
                     format!(
-                        "无法解析配置文件: {:?}",
+                        "Failed to parse config file: {:?}",
                         config_file
                     )
                 })?;
 
             tracing::info!(
-                "配置文件加载成功: {:?}",
+                "Config file loaded successfully: {:?}",
                 config_file
             );
         } else {
             tracing::info!(
-                "配置文件不存在，使用默认配置: {:?}",
+                "Config file does not exist, using default config: {:?}",
                 config_file
             );
             self.save()?; // 创建默认配置文件
@@ -143,20 +143,20 @@ impl ConfigManager {
         self.config_paths.ensure_config_dir_exists()?;
 
         let content = toml::to_string_pretty(&self.config)
-            .context("无法序列化配置")?;
+            .context("Failed to serialize config")?;
 
         let config_file = self.config_paths.config_file();
         fs::write(config_file, content).with_context(
             || {
                 format!(
-                    "无法写入配置文件: {:?}",
+                    "Failed to write config file: {:?}",
                     config_file
                 )
             },
         )?;
 
         tracing::info!(
-            "配置文件保存成功: {:?}",
+            "Config file saved successfully: {:?}",
             config_file
         );
         Ok(())

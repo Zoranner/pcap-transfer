@@ -135,7 +135,7 @@ pub async fn run_sender_with_gui_stats(
                 }
             }
             Err(e) => {
-                error!("发送数据包失败: {}", e);
+                error!("Failed to send packet: {}", e);
                 errors_count += 1;
 
                 // 批量更新错误统计
