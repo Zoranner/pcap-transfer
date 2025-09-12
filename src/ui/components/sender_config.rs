@@ -3,7 +3,7 @@
 use super::super::config::SenderConfig;
 use super::PathSelector;
 use crate::app::config::types::NetworkType;
-use eframe::egui;
+use egui;
 
 /// 渲染网络类型选择组合框
 fn render_network_type_combo(

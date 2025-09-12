@@ -1,6 +1,6 @@
 //! GUI主应用程序模块
 
-use eframe::egui;
+use egui;
 use std::sync::{Arc, Mutex};
 use tracing;
 

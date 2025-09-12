@@ -37,7 +37,7 @@ impl AppStateManager {
     /// 安全地渲染发送器统计信息
     pub fn render_sender_stats_safely(
         stats: &Arc<Mutex<TransferStats>>,
-        ui: &mut eframe::egui::Ui,
+        ui: &mut egui::Ui,
     ) {
         if let Ok(stats_guard) = stats.lock() {
             crate::ui::components::render_stats(
@@ -57,7 +57,7 @@ impl AppStateManager {
     /// 安全地渲染接收器统计信息
     pub fn render_receiver_stats_safely(
         stats: &Arc<Mutex<TransferStats>>,
-        ui: &mut eframe::egui::Ui,
+        ui: &mut egui::Ui,
     ) {
         if let Ok(stats_guard) = stats.lock() {
             crate::ui::components::render_stats(

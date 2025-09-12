@@ -3,7 +3,7 @@
 //! 包含状态指示器、状态标签按钮等与状态显示相关的组件。
 
 use crate::core::network::sender::TransferState;
-use eframe::egui;
+use egui;
 
 /// 状态标签按钮组件
 /// 结合了标签页切换和状态显示功能
