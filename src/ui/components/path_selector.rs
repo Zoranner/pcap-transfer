@@ -1,6 +1,6 @@
 //! 路径选择组件 - 包含输入框和浏览按钮的组合组件
 
-use eframe::egui;
+use egui;
 
 /// 路径选择组件
 /// 包含文本输入框和浏览按钮的组合
@@ -39,7 +39,7 @@ impl<'a> egui::Widget for PathSelector<'a> {
         let input_width =
             actual_width - button_width - spacing;
 
-        ui.horizontal_centered(|ui| {
+        ui.horizontal(|ui| {
             // 输入框
             let text_edit =
                 if let Some(hint) = &self.hint_text {

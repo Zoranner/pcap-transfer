@@ -2,7 +2,7 @@
 //!
 //! 负责渲染发送器和接收器的主要界面
 
-use eframe::egui;
+use egui;
 use std::sync::{Arc, Mutex};
 
 use crate::core::network::sender::TransferState;

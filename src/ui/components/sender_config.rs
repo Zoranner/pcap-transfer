@@ -3,7 +3,7 @@
 use super::super::config::SenderConfig;
 use super::PathSelector;
 use crate::app::config::types::NetworkType;
-use eframe::egui;
+use egui;
 
 /// 渲染网络类型选择组合框
 fn render_network_type_combo(
@@ -60,7 +60,7 @@ pub fn render_sender_config(
             ui.label("Target Port");
             ui.add(
                 egui::DragValue::new(&mut config.port)
-                    .range(1..=65535),
+                    .range(1.0..=65535.0),
             );
             ui.end_row();
 

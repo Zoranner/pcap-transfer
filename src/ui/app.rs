@@ -1,6 +1,6 @@
 //! GUI主应用程序模块
 
-use eframe::egui;
+use egui;
 use std::sync::{Arc, Mutex};
 use tracing;
 
@@ -143,9 +143,9 @@ impl Default for DataTransferApp {
 }
 
 impl DataTransferApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(ctx: &egui::Context) -> Self {
         // 配置跨平台的中文字体支持
-        loader::setup_fonts(&cc.egui_ctx);
+        loader::setup_fonts(ctx);
         Self::default()
     }
 
@@ -252,12 +252,9 @@ impl DataTransferApp {
     }
 }
 
-impl eframe::App for DataTransferApp {
-    fn update(
-        &mut self,
-        ctx: &egui::Context,
-        _frame: &mut eframe::Frame,
-    ) {
+impl DataTransferApp {
+    /// 更新应用状态和渲染UI
+    pub fn update(&mut self, ctx: &egui::Context) {
         // 同步共享的传输状态
         AppStateManager::sync_sender_state(
             &mut self.sender_transfer_state,
@@ -360,16 +357,11 @@ impl eframe::App for DataTransferApp {
         });
 
         // 定期刷新界面以更新统计信息
-        ctx.request_repaint_after(
-            std::time::Duration::from_millis(100),
-        );
+        ctx.request_repaint();
     }
 
-    fn on_exit(
-        &mut self,
-        _gl: Option<&eframe::glow::Context>,
-    ) {
-        // 应用退出时保存配置
+    /// 应用退出时保存配置
+    pub fn on_exit(&mut self) {
         if let Err(e) =
             self.transfer_service.config_manager.save()
         {
@@ -383,36 +375,294 @@ impl eframe::App for DataTransferApp {
 
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
-    let viewport_builder = egui::ViewportBuilder::default()
-        .with_inner_size([400.0, 500.0])
-        .with_min_inner_size([300.0, 500.0])
-        .with_resizable(true)
-        .with_title("Pcap Transfer");
-
-    let options = eframe::NativeOptions {
-        viewport: viewport_builder,
-        // 添加额外的窗口控制选项
-        hardware_acceleration:
-            eframe::HardwareAcceleration::Preferred,
-        ..Default::default()
+    use egui_sdl2_gl::{
+        gl, sdl2, translate_virtual_key_code,
     };
+    use sdl2::event::Event;
+    use sdl2::keyboard::Keycode;
+
+    // 初始化 SDL2
+    let sdl_context = sdl2::init().map_err(|e| {
+        tracing::error!("Failed to initialize SDL2: {}", e);
+        AppError::Gui(format!(
+            "SDL2 initialization failed: {}",
+            e
+        ))
+    })?;
+
+    let video_subsystem =
+        sdl_context.video().map_err(|e| {
+            tracing::error!(
+                "Failed to initialize SDL2 video: {}",
+                e
+            );
+            AppError::Gui(format!(
+                "SDL2 video initialization failed: {}",
+                e
+            ))
+        })?;
+
+    // 创建窗口
+    let mut window = video_subsystem
+        .window("Pcap Transfer", 400, 500)
+        .opengl()
+        .build()
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to create window: {}",
+                e
+            );
+            AppError::Gui(format!(
+                "Window creation failed: {}",
+                e
+            ))
+        })?;
+
+    // 锁定窗口尺寸，防止用户调整大小和最大化
+    let (initial_w, initial_h) = window.size();
+    window.set_resizable(false);
+    let _ = window.set_minimum_size(initial_w, initial_h);
+    let _ = window.set_maximum_size(initial_w, initial_h);
+
+    // 创建 OpenGL 上下文
+    let _gl_context =
+        window.gl_create_context().map_err(|e| {
+            tracing::error!(
+                "Failed to create OpenGL context: {}",
+                e
+            );
+            AppError::Gui(format!(
+                "OpenGL context creation failed: {}",
+                e
+            ))
+        })?;
+
+    // 加载 OpenGL 函数
+    gl::load_with(|s| {
+        video_subsystem.gl_get_proc_address(s) as *const _
+    });
+
+    // 创建 egui 上下文
+    let egui_ctx = egui::Context::default();
+
+    // 创建 painter
+    let mut painter = egui_sdl2_gl::painter::Painter::new(
+        &window,
+        1.0,
+        egui_sdl2_gl::ShaderVersion::Default,
+    );
 
     // 获取当前的 tokio runtime handle
     let runtime_handle = tokio::runtime::Handle::current();
 
-    eframe::run_native(
-        "Pcap Transfer",
-        options,
-        Box::new(move |cc| {
-            let mut app = DataTransferApp::new(cc);
-            app.runtime_handle = Some(runtime_handle);
-            Ok(Box::new(app))
-        }),
-    )
-    .map_err(|e| {
-        tracing::error!("GUI startup failed: {}", e);
-        AppError::Gui(e.to_string())
-    })?;
+    // 创建应用实例
+    let mut app = DataTransferApp::new(&egui_ctx);
+    app.runtime_handle = Some(runtime_handle);
+
+    // 获取初始窗口大小
+    let (window_width, window_height) = window.size();
+
+    // 创建输入状态
+    let mut input_state = egui::RawInput::default();
+    input_state.screen_rect =
+        Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(
+                window_width as f32,
+                window_height as f32,
+            ),
+        ));
+
+    // 事件循环
+    let mut event_pump =
+        sdl_context.event_pump().map_err(|e| {
+            tracing::error!(
+                "Failed to create event pump: {}",
+                e
+            );
+            AppError::Gui(format!(
+                "Event pump creation failed: {}",
+                e
+            ))
+        })?;
+
+    let start_time = std::time::Instant::now();
+
+    'running: loop {
+        // 重置输入事件
+        input_state.events.clear();
+
+        // 设置时间信息
+        input_state.time =
+            Some(start_time.elapsed().as_secs_f64());
+
+        // 处理 SDL2 事件
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => {
+                    app.on_exit();
+                    break 'running;
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
+                    app.on_exit();
+                    break 'running;
+                }
+                Event::Window {
+                    win_event:
+                        sdl2::event::WindowEvent::Resized(
+                            width,
+                            height,
+                        ),
+                    ..
+                } => {
+                    // 更新屏幕尺寸
+                    input_state.screen_rect =
+                        Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(
+                                width as f32,
+                                height as f32,
+                            ),
+                        ));
+
+                    // 更新 OpenGL 视口
+                    unsafe {
+                        gl::Viewport(0, 0, width, height);
+                    }
+                }
+                Event::MouseButtonDown {
+                    mouse_btn,
+                    x,
+                    y,
+                    ..
+                } => {
+                    let pos =
+                        egui::Pos2::new(x as f32, y as f32);
+                    let button = match mouse_btn {
+                        sdl2::mouse::MouseButton::Left => egui::PointerButton::Primary,
+                        sdl2::mouse::MouseButton::Right => egui::PointerButton::Secondary,
+                        sdl2::mouse::MouseButton::Middle => egui::PointerButton::Middle,
+                        _ => continue,
+                    };
+                    input_state.events.push(
+                        egui::Event::PointerButton {
+                            pos,
+                            button,
+                            pressed: true,
+                            modifiers:
+                                egui::Modifiers::default(),
+                        },
+                    );
+                }
+                Event::MouseButtonUp {
+                    mouse_btn,
+                    x,
+                    y,
+                    ..
+                } => {
+                    let pos =
+                        egui::Pos2::new(x as f32, y as f32);
+                    let button = match mouse_btn {
+                        sdl2::mouse::MouseButton::Left => egui::PointerButton::Primary,
+                        sdl2::mouse::MouseButton::Right => egui::PointerButton::Secondary,
+                        sdl2::mouse::MouseButton::Middle => egui::PointerButton::Middle,
+                        _ => continue,
+                    };
+                    input_state.events.push(
+                        egui::Event::PointerButton {
+                            pos,
+                            button,
+                            pressed: false,
+                            modifiers:
+                                egui::Modifiers::default(),
+                        },
+                    );
+                }
+                Event::MouseMotion { x, y, .. } => {
+                    input_state.events.push(
+                        egui::Event::PointerMoved(
+                            egui::Pos2::new(
+                                x as f32, y as f32,
+                            ),
+                        ),
+                    );
+                }
+                Event::TextInput { text, .. } => {
+                    input_state
+                        .events
+                        .push(egui::Event::Text(text));
+                }
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    if let Some(key) =
+                        translate_virtual_key_code(keycode)
+                    {
+                        input_state.events.push(egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::default(),
+                        });
+                    }
+                }
+                Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    if let Some(key) =
+                        translate_virtual_key_code(keycode)
+                    {
+                        input_state.events.push(egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::default(),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let full_output =
+            egui_ctx.run(input_state.take(), |ctx| {
+                // 更新应用
+                app.update(ctx);
+            });
+
+        // 清除屏幕
+        unsafe {
+            gl::ClearColor(0.1, 0.1, 0.1, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+
+        // 渲染 egui
+        let clipped_primitives = egui_ctx.tessellate(
+            full_output.shapes,
+            full_output.pixels_per_point,
+        );
+        painter.paint_jobs(
+            None,
+            full_output.textures_delta,
+            clipped_primitives,
+        );
+
+        // 交换窗口缓冲区
+        window.gl_swap_window();
+
+        // 控制帧率
+        std::thread::sleep(std::time::Duration::new(
+            0,
+            1_000_000_000u32 / 60,
+        ));
+    }
 
     Ok(())
 }

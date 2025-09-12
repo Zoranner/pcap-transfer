@@ -3,7 +3,7 @@
 //! 包含状态指示器、状态标签按钮等与状态显示相关的组件。
 
 use crate::core::network::sender::TransferState;
-use eframe::egui;
+use egui;
 
 /// 状态标签按钮组件
 /// 结合了标签页切换和状态显示功能
@@ -54,7 +54,7 @@ impl StatusTabButton {
         } else {
             egui::Stroke::new(
                 1.0,
-                ui.style().visuals.window_stroke.color,
+                ui.style().visuals.window_stroke().color,
             )
         };
 
@@ -63,7 +63,12 @@ impl StatusTabButton {
             4.0,
             bg_color,
         );
-        ui.painter().rect_stroke(button_rect, 4.0, stroke);
+        ui.painter().rect_stroke(
+            button_rect,
+            4.0,
+            stroke,
+            egui::epaint::StrokeKind::Outside,
+        );
 
         // 绘制按钮文本
         let text_color = if self.is_selected {
