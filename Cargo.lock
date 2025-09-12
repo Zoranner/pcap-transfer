@@ -2131,9 +2131,9 @@ dependencies = [
 
 [[package]]
 name = "pcapfile-io"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f942547cd9a96409d365abc64ce7156c72d444bd8b1a17f81ef62ce9a8e35222"
+checksum = "1c664c3d5058ca322638e083da488d6d566f111a574bee8f8426d1507f1ae490"
 dependencies = [
  "base64",
  "chrono",

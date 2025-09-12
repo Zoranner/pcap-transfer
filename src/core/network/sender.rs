@@ -97,7 +97,7 @@ pub async fn run_sender_with_gui_stats(
             }
         }
 
-        let packet_data = &packet.data;
+        let packet_data = &packet.packet.data;
         let packet_time = packet.capture_time();
 
         // 时序控制（精确重放）
