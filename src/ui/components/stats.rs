@@ -2,7 +2,7 @@
 
 use crate::core::stats::collector::TransferStats;
 use crate::utils::helpers::format_bytes;
-use eframe::egui;
+use egui;
 
 /// 渲染统计信息
 pub fn render_stats(
