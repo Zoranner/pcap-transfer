@@ -7,7 +7,7 @@ description = "高性能数据包传输测试工具"
 
 [dependencies]
 # 数据包读写
-pcapfile-io = { version = "0.1.1" }
+pcapfile-io = { version = "0.1.2" }
 
 # 网络编程
 tokio = { version = "1.0", features = ["full"] }
