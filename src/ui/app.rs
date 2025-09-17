@@ -161,29 +161,35 @@ impl DataTransferApp {
             return;
         }
 
-        if let Some(handle) = &self.runtime_handle {
-            match self.transfer_service.start_sender(
-                &self.sender_config,
-                Arc::clone(&self.sender_stats),
-                handle,
-            ) {
-                Ok(shared_state) => {
-                    self.sender_shared_state =
-                        Some(shared_state);
-                    self.sender_transfer_state =
-                        TransferState::Running;
-                }
-                Err(e) => {
-                    self.sender_transfer_state =
-                        TransferState::Error(e.to_string());
-                }
-            }
-        } else {
-            self.sender_transfer_state =
-                TransferState::Error(
-                    "Runtime handle not initialized"
-                        .to_string(),
+        // 获取当前的 Tokio runtime handle
+        let handle =
+            match tokio::runtime::Handle::try_current() {
+                Ok(h) => h,
+                Err(_) => {
+                    tracing::error!("Unable to get Tokio runtime handle");
+                    self.sender_transfer_state = TransferState::Error(
+                    "Runtime handle not initialized".to_string(),
                 );
+                    return;
+                }
+            };
+        self.runtime_handle = Some(handle.clone());
+
+        match self.transfer_service.start_sender(
+            &self.sender_config,
+            Arc::clone(&self.sender_stats),
+            &handle,
+        ) {
+            Ok(shared_state) => {
+                self.sender_shared_state =
+                    Some(shared_state);
+                self.sender_transfer_state =
+                    TransferState::Running;
+            }
+            Err(e) => {
+                self.sender_transfer_state =
+                    TransferState::Error(e.to_string());
+            }
         }
     }
 
@@ -237,10 +243,12 @@ impl DataTransferApp {
 
     /// 停止发送器
     fn stop_sender(&mut self) {
+        tracing::info!("Stopping sender...");
         TransferService::stop_transfer(
             &self.sender_shared_state,
         );
         self.sender_transfer_state = TransferState::Idle;
+        tracing::info!("Sender stop signal sent");
     }
 
     /// 停止接收器

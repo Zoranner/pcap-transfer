@@ -45,9 +45,11 @@ pub async fn run_receiver_with_gui_stats(
             .await?;
 
     // 创建pcap写入器
-    let mut writer_config = WriterConfig::default();
-    writer_config.common.enable_index_cache = true;
-    writer_config.max_packets_per_file = 10000;
+    let writer_config = WriterConfig {
+        index_cache_size: 1000, // 设置索引缓存大小
+        max_packets_per_file: 1000,
+        ..Default::default()
+    };
 
     let mut writer = PcapWriter::new_with_config(
         &config.output_path,
@@ -65,12 +67,7 @@ pub async fn run_receiver_with_gui_stats(
 
     let mut buffer = vec![0u8; buffer_size];
 
-    // 批量统计变量
-    let batch_size = 100;
-    let mut batch_bytes = Vec::with_capacity(batch_size);
-    let mut batch_times = Vec::with_capacity(batch_size);
-    let mut errors_count = 0;
-    let error_batch_size = 10;
+    // 统计信息
     // 接收循环 - 使用 tokio::select! 来同时监听数据包接收和停止信号
     loop {
         tokio::select! {
@@ -87,58 +84,34 @@ pub async fn run_receiver_with_gui_stats(
                         // 写入数据包
                         if let Err(e) = writer.write_packet(&packet) {
                             error!("Failed to write packet: {}", e);
-                            errors_count += 1;
-                            if errors_count >= error_batch_size {
-                                if let Ok(mut stats_guard) = stats.lock() {
-                                    for _ in 0..errors_count {
-                                        stats_guard.add_error();
-                                    }
-                                }
-                                errors_count = 0;
+                            
+                            // 立即更新错误统计
+                            if let Ok(mut stats_guard) = stats.lock() {
+                                stats_guard.add_error();
                             }
                         } else {
-                            // 收集统计信息到批次
-                            batch_bytes.push(bytes_received);
-                            batch_times.push(capture_time);
-
-                            // 批量更新统计信息
-                            if batch_bytes.len() >= batch_size {
-                                if let Ok(mut stats_guard) = stats.lock() {
-                                    for (bytes, time) in batch_bytes.iter().zip(batch_times.iter()) {
-                                        stats_guard.update_with_timestamp(*bytes, *time);
-                                    }
-                                }
-                                batch_bytes.clear();
-                                batch_times.clear();
+                            // 立即更新统计信息
+                            if let Ok(mut stats_guard) = stats.lock() {
+                                stats_guard.update_with_timestamp(bytes_received, capture_time);
                             }
-
-                            // 移除了最大包数限制检查
                         }
                     }
                     Err(e) => {
                         error!("Failed to create packet: {}", e);
-                        errors_count += 1;
-                        if errors_count >= error_batch_size {
-                            if let Ok(mut stats_guard) = stats.lock() {
-                                for _ in 0..errors_count {
-                                    stats_guard.add_error();
-                                }
-                            }
-                            errors_count = 0;
+                        
+                        // 立即更新错误统计
+                        if let Ok(mut stats_guard) = stats.lock() {
+                            stats_guard.add_error();
                         }
                     }
                 }
                     }
                     Err(e) => {
                         error!("Failed to receive packet: {}", e);
-                        errors_count += 1;
-                        if errors_count >= error_batch_size {
-                            if let Ok(mut stats_guard) = stats.lock() {
-                                for _ in 0..errors_count {
-                                    stats_guard.add_error();
-                                }
-                            }
-                            errors_count = 0;
+                        
+                        // 立即更新错误统计
+                        if let Ok(mut stats_guard) = stats.lock() {
+                            stats_guard.add_error();
                         }
                     }
                 }
@@ -150,27 +123,6 @@ pub async fn run_receiver_with_gui_stats(
                         break;
                     }
                 }
-            }
-        }
-    }
-
-    // 处理剩余的批次统计
-    if !batch_bytes.is_empty() {
-        if let Ok(mut stats_guard) = stats.lock() {
-            for (bytes, time) in
-                batch_bytes.iter().zip(batch_times.iter())
-            {
-                stats_guard
-                    .update_with_timestamp(*bytes, *time);
-            }
-        }
-    }
-
-    // 处理剩余的错误统计
-    if errors_count > 0 {
-        if let Ok(mut stats_guard) = stats.lock() {
-            for _ in 0..errors_count {
-                stats_guard.add_error();
             }
         }
     }
