@@ -16,7 +16,7 @@ impl ConfigValidator {
     ) -> Result<()> {
         // 根据数据格式验证对应的路径
         match config.data_format {
-            DataFormat::PCAP => {
+            DataFormat::Pcap => {
                 if config.pcap_path.is_empty() {
                     return Err(AppError::validation(
                         "PCAP Path",
@@ -41,7 +41,7 @@ impl ConfigValidator {
                     ));
                 }
             }
-            DataFormat::CSV => {
+            DataFormat::Csv => {
                 if config.csv_file.is_empty() {
                     return Err(AppError::validation(
                         "CSV File",

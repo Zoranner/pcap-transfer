@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use super::paths::ConfigPaths;
-use super::types::NetworkType;
+use super::types::{DataFormat, NetworkType};
 
 /// 应用程序配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -27,21 +27,11 @@ pub struct NetworkConfig {
 /// 发送器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SenderConfig {
-    pub dataset_path: String,
-    pub csv_file: String, // CSV文件路径
-    pub csv_send_interval: u64, // CSV发送周期（毫秒）
+    pub data_format: String, // 数据格式：pcap 或 csv
+    pub dataset_path: String, // PCAP数据集路径（文件夹）
+    pub csv_file: String,    // CSV文件路径（文件）
+    pub csv_packet_interval: u64, // CSV发送周期（毫秒）
     pub network: NetworkConfig,
-}
-
-impl Default for SenderConfig {
-    fn default() -> Self {
-        Self {
-            dataset_path: "./dataset".to_string(),
-            csv_file: String::new(), // CSV文件路径默认为空
-            csv_send_interval: 1000, // 默认1秒发送周期
-            network: NetworkConfig::default(),
-        }
-    }
 }
 
 /// 接收器配置
@@ -60,6 +50,18 @@ impl Default for NetworkConfig {
             port: 8080,
             network_type: "unicast".to_string(),
             interface: String::new(),
+        }
+    }
+}
+
+impl Default for SenderConfig {
+    fn default() -> Self {
+        Self {
+            data_format: "pcap".to_string(), // 默认使用PCAP格式
+            dataset_path: "./dataset".to_string(),
+            csv_file: String::new(), // CSV文件路径默认为空
+            csv_packet_interval: 1000, // 默认1秒发送周期
+            network: NetworkConfig::default(),
         }
     }
 }
@@ -171,56 +173,12 @@ impl ConfigManager {
         &self.config
     }
 
-    /// 更新发送器网络配置
-    pub fn update_sender_network_config(
-        &mut self,
-        address: String,
-        port: u16,
-        network_type: NetworkType,
-        interface: Option<String>,
-    ) {
-        self.config.sender.network.address = address;
-        self.config.sender.network.port = port;
-        self.config.sender.network.network_type =
-            match network_type {
-                NetworkType::Unicast => {
-                    "unicast".to_string()
-                }
-                NetworkType::Broadcast => {
-                    "broadcast".to_string()
-                }
-                NetworkType::Multicast => {
-                    "multicast".to_string()
-                }
-            };
-        self.config.sender.network.interface =
-            interface.unwrap_or_default();
-    }
-
-    /// 更新接收器网络配置
-    pub fn update_receiver_network_config(
-        &mut self,
-        address: String,
-        port: u16,
-        network_type: NetworkType,
-        interface: Option<String>,
-    ) {
-        self.config.receiver.network.address = address;
-        self.config.receiver.network.port = port;
-        self.config.receiver.network.network_type =
-            match network_type {
-                NetworkType::Unicast => {
-                    "unicast".to_string()
-                }
-                NetworkType::Broadcast => {
-                    "broadcast".to_string()
-                }
-                NetworkType::Multicast => {
-                    "multicast".to_string()
-                }
-            };
-        self.config.receiver.network.interface =
-            interface.unwrap_or_default();
+    /// 获取发送器数据格式
+    pub fn get_sender_data_format(&self) -> DataFormat {
+        match self.config.sender.data_format.as_str() {
+            "csv" => DataFormat::Csv,
+            _ => DataFormat::Pcap, // 默认为PCAP
+        }
     }
 
     /// 获取发送器网络类型
@@ -253,27 +211,111 @@ impl ConfigManager {
         }
     }
 
-    /// 更新发送器配置
+    /// 更新发送器配置（统一接口）
     pub fn update_sender_config(
         &mut self,
-        dataset_path: String,
+        config: &crate::ui::config::SenderConfig,
     ) {
-        self.config.sender.dataset_path = dataset_path;
+        // 更新数据格式
+        self.update_sender_data_format(config.data_format);
+
+        // 更新路径配置
+        self.config.sender.dataset_path =
+            config.pcap_path.clone();
+        self.config.sender.csv_file =
+            config.csv_file.clone();
+        self.config.sender.csv_packet_interval =
+            config.csv_packet_interval;
+
+        // 更新网络配置
+        self.update_sender_network_config(
+            config.address.clone(),
+            config.port,
+            config.network_type,
+            config.interface.clone(),
+        );
     }
 
-    /// 更新CSV配置
-    pub fn update_csv_config(&mut self, csv_file: String, csv_send_interval: u64) {
-        self.config.sender.csv_file = csv_file;
-        self.config.sender.csv_send_interval = csv_send_interval;
-    }
-
-    /// 更新接收器配置
+    /// 更新接收器配置（统一接口）
     pub fn update_receiver_config(
         &mut self,
-        output_path: String,
-        dataset_name: String,
+        config: &crate::ui::config::ReceiverConfig,
     ) {
-        self.config.receiver.output_path = output_path;
-        self.config.receiver.dataset_name = dataset_name;
+        // 更新路径配置
+        self.config.receiver.output_path =
+            config.output_path.clone();
+        self.config.receiver.dataset_name =
+            config.dataset_name.clone();
+
+        // 更新网络配置
+        self.update_receiver_network_config(
+            config.address.clone(),
+            config.port,
+            config.network_type,
+            config.interface.clone(),
+        );
+    }
+
+    /// 更新发送器数据格式（私有方法）
+    fn update_sender_data_format(
+        &mut self,
+        data_format: DataFormat,
+    ) {
+        self.config.sender.data_format = match data_format {
+            DataFormat::Pcap => "pcap".to_string(),
+            DataFormat::Csv => "csv".to_string(),
+        };
+    }
+
+    /// 更新发送器网络配置（私有方法）
+    fn update_sender_network_config(
+        &mut self,
+        address: String,
+        port: u16,
+        network_type: NetworkType,
+        interface: Option<String>,
+    ) {
+        self.config.sender.network.address = address;
+        self.config.sender.network.port = port;
+        self.config.sender.network.network_type =
+            match network_type {
+                NetworkType::Unicast => {
+                    "unicast".to_string()
+                }
+                NetworkType::Broadcast => {
+                    "broadcast".to_string()
+                }
+                NetworkType::Multicast => {
+                    "multicast".to_string()
+                }
+            };
+        self.config.sender.network.interface =
+            interface.unwrap_or_default();
+    }
+
+    /// 更新接收器网络配置（私有方法）
+    fn update_receiver_network_config(
+        &mut self,
+        address: String,
+        port: u16,
+        network_type: NetworkType,
+        interface: Option<String>,
+    ) {
+        self.config.receiver.network.address = address;
+        self.config.receiver.network.port = port;
+        self.config.receiver.network.network_type =
+            match network_type {
+                NetworkType::Unicast => {
+                    "unicast".to_string()
+                }
+                NetworkType::Broadcast => {
+                    "broadcast".to_string()
+                }
+                NetworkType::Multicast => {
+                    "multicast".to_string()
+                }
+            };
+        self.config.receiver.network.interface =
+            interface.unwrap_or_default();
     }
 }

@@ -12,25 +12,27 @@ fn render_network_type_combo(
     enabled: bool,
 ) {
     ui.add_enabled_ui(enabled, |ui| {
-        egui::ComboBox::from_id_source("receiver_network_type_combo")
-            .selected_text(format!("{:?}", network_type))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Unicast,
-                    "Unicast",
-                );
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Multicast,
-                    "Multicast",
-                );
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Broadcast,
-                    "Broadcast",
-                );
-            });
+        egui::ComboBox::from_id_salt(
+            "receiver_network_type_combo",
+        )
+        .selected_text(format!("{:?}", network_type))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(
+                network_type,
+                NetworkType::Unicast,
+                "Unicast",
+            );
+            ui.selectable_value(
+                network_type,
+                NetworkType::Multicast,
+                "Multicast",
+            );
+            ui.selectable_value(
+                network_type,
+                NetworkType::Broadcast,
+                "Broadcast",
+            );
+        });
     });
 }
 

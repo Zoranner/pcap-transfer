@@ -69,7 +69,7 @@ impl CsvParser {
                 CsvDataType::from_string(type_str)
                     .map_err(|e| {
                         AppError::validation(
-                            &format!("Column {}", i + 1),
+                            format!("Column {}", i + 1),
                             e,
                         )
                     })?;
@@ -94,7 +94,7 @@ impl CsvParser {
 
             if row.len() != columns.len() {
                 return Err(AppError::validation(
-                    &format!("CSV Line {}", line_num + 2),
+                    format!("CSV Line {}", line_num + 2),
                     format!(
                         "Expected {} columns, got {}",
                         columns.len(),
@@ -372,7 +372,6 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
 
     #[test]
     fn test_csv_parser() {

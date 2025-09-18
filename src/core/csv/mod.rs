@@ -6,4 +6,4 @@ pub mod parser;
 pub mod types;
 
 pub use parser::CsvParser;
-pub use types::{CsvColumn, CsvDataType, CsvPacket};
+// pub use types::{CsvColumn, CsvDataType, CsvPacket}; // Unused imports

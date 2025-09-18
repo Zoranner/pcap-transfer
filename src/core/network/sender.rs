@@ -31,7 +31,7 @@ pub async fn run_sender_with_gui_stats(
     network_type: NetworkType,
     interface: Option<String>,
     data_format: DataFormat,
-    csv_send_interval: u64, // CSV发送周期（毫秒）
+    csv_packet_interval: u64, // CSV发送周期（毫秒）
     stats: Arc<Mutex<TransferStats>>,
     transfer_state: Arc<Mutex<TransferState>>,
 ) -> Result<()> {
@@ -74,7 +74,7 @@ pub async fn run_sender_with_gui_stats(
 
     // 根据数据格式选择不同的处理方式
     match config.data_format {
-        DataFormat::PCAP => {
+        DataFormat::Pcap => {
             // PCAP数据集处理
             let dataset_path = &config.dataset_path;
             let dataset_name = dataset_path
@@ -155,13 +155,13 @@ pub async fn run_sender_with_gui_stats(
                 }
             }
         }
-        DataFormat::CSV => {
+        DataFormat::Csv => {
             // CSV数据处理
             let csv_parser =
                 CsvParser::from_file(&config.dataset_path)?;
             let row_count = csv_parser.row_count();
 
-            tracing::info!("CSV file loaded: {} rows, send interval: {}ms", row_count, csv_send_interval);
+            tracing::info!("CSV file loaded: {} rows, packet interval: {}ms", row_count, csv_packet_interval);
 
             // 发送CSV数据包
             for row_index in 0..row_count {
@@ -189,36 +189,11 @@ pub async fn run_sender_with_gui_stats(
                 let packet_data = &csv_packet.data;
                 let packet_time = csv_packet.timestamp;
 
-                // 打印发送的数据到控制台
-                println!("Row {}: {} bytes", row_index, packet_data.len());
-                println!("  Raw bytes: {:?}", packet_data);
-                
-                // 尝试解析并显示数据内容
-                if packet_data.len() >= 4 {
-                    // 显示前几个字节作为示例
-                    let mut offset = 0;
-                    if packet_data.len() > offset + 4 {
-                        let cmd_code = u32::from_le_bytes([
-                            packet_data[offset], packet_data[offset+1], 
-                            packet_data[offset+2], packet_data[offset+3]
-                        ]);
-                        println!("  Command Code: 0x{:04X}", cmd_code);
-                        offset += 4;
-                    }
-                    
-                    // 显示一些f32值
-                    for i in 0..3 {
-                        if packet_data.len() > offset + 4 {
-                            let float_val = f32::from_le_bytes([
-                                packet_data[offset], packet_data[offset+1], 
-                                packet_data[offset+2], packet_data[offset+3]
-                            ]);
-                            println!("  Float {}: {:.6}", i, float_val);
-                            offset += 4;
-                        }
-                    }
-                }
-                tracing::info!("Sending row {}: {} bytes", row_index, packet_data.len());
+                tracing::info!(
+                    "Sending row {}: {} bytes",
+                    row_index,
+                    packet_data.len()
+                );
 
                 // 发送数据包
                 match socket
@@ -256,7 +231,7 @@ pub async fn run_sender_with_gui_stats(
                 if row_index < row_count - 1 {
                     tokio::time::sleep(
                         tokio::time::Duration::from_millis(
-                            csv_send_interval,
+                            csv_packet_interval,
                         ),
                     )
                     .await;

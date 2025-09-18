@@ -1,3 +1,4 @@
+use std::fmt;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
@@ -12,9 +13,21 @@ use crate::utils::helpers::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataFormat {
     /// PCAP数据集格式
-    PCAP,
+    Pcap,
     /// CSV数据格式
-    CSV,
+    Csv,
+}
+
+impl fmt::Display for DataFormat {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        match self {
+            DataFormat::Pcap => write!(f, "PCAP"),
+            DataFormat::Csv => write!(f, "CSV"),
+        }
+    }
 }
 
 /// 网络类型枚举
@@ -129,10 +142,10 @@ impl SenderAppConfig {
 
         // 根据数据格式验证路径
         match data_format {
-            DataFormat::PCAP => {
+            DataFormat::Pcap => {
                 validate_pcap_path(&dataset_path)?;
             }
-            DataFormat::CSV => {
+            DataFormat::Csv => {
                 if !dataset_path.exists() {
                     return Err(crate::app::error::types::DataTransferError::validation(
                         "CSV File",
@@ -161,10 +174,10 @@ impl SenderAppConfig {
 
         // 根据数据格式验证路径
         match self.data_format {
-            DataFormat::PCAP => {
+            DataFormat::Pcap => {
                 validate_pcap_path(&self.dataset_path)?;
             }
-            DataFormat::CSV => {
+            DataFormat::Csv => {
                 if !self.dataset_path.exists() {
                     return Err(crate::app::error::types::DataTransferError::validation(
                         "CSV File",

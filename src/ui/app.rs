@@ -62,11 +62,13 @@ impl Default for DataTransferApp {
         // 从配置管理器初始化GUI配置
         let config = config_manager.config();
         let sender_config = SenderConfig {
-            data_format:
-                crate::app::config::types::DataFormat::PCAP, // 默认使用PCAP格式
+            data_format: config_manager
+                .get_sender_data_format(), // 从配置中加载数据格式
             pcap_path: config.sender.dataset_path.clone(),
             csv_file: config.sender.csv_file.clone(), // 从配置中加载CSV文件路径
-            csv_send_interval: config.sender.csv_send_interval, // 从配置中加载发送周期
+            csv_packet_interval: config
+                .sender
+                .csv_packet_interval, // 从配置中加载发送周期
             address: config.sender.network.address.clone(),
             port: config.sender.network.port,
             network_type: config_manager
@@ -259,6 +261,19 @@ impl DataTransferApp {
         );
         self.receiver_transfer_state = TransferState::Idle;
     }
+
+    /// 保存当前GUI配置到配置管理器
+    fn save_current_config(&mut self) {
+        // 保存发送器配置（统一接口）
+        self.transfer_service
+            .config_manager
+            .update_sender_config(&self.sender_config);
+
+        // 保存接收器配置（统一接口）
+        self.transfer_service
+            .config_manager
+            .update_receiver_config(&self.receiver_config);
+    }
 }
 
 impl eframe::App for DataTransferApp {
@@ -378,7 +393,10 @@ impl eframe::App for DataTransferApp {
         &mut self,
         _gl: Option<&eframe::glow::Context>,
     ) {
-        // 应用退出时保存配置
+        // 应用退出时保存当前配置
+        self.save_current_config();
+
+        // 保存到配置文件
         if let Err(e) =
             self.transfer_service.config_manager.save()
         {

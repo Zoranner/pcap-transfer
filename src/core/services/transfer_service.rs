@@ -32,29 +32,18 @@ impl TransferService {
         stats: Arc<Mutex<TransferStats>>,
         runtime_handle: &tokio::runtime::Handle,
     ) -> Result<Arc<Mutex<TransferState>>> {
-        // 保存当前配置到配置管理器
-        self.config_manager.update_sender_network_config(
-            config.address.clone(),
-            config.port,
-            config.network_type,
-            config.interface.clone(),
-        );
-        // 保存PCAP路径（主要路径，用于兼容现有配置系统）
-        self.config_manager
-            .update_sender_config(config.pcap_path.clone());
-        // 保存CSV配置
-        self.config_manager
-            .update_csv_config(config.csv_file.clone(), config.csv_send_interval);
+        // 保存发送器配置（统一接口）
+        self.config_manager.update_sender_config(config);
         if let Err(e) = self.config_manager.save() {
             tracing::warn!("Failed to save config: {}", e);
         }
 
         // 根据数据格式选择对应的路径
         let dataset_path = match config.data_format {
-            crate::app::config::types::DataFormat::PCAP => {
+            crate::app::config::types::DataFormat::Pcap => {
                 std::path::PathBuf::from(&config.pcap_path)
             }
-            crate::app::config::types::DataFormat::CSV => {
+            crate::app::config::types::DataFormat::Csv => {
                 std::path::PathBuf::from(&config.csv_file)
             }
         };
@@ -63,7 +52,8 @@ impl TransferService {
         let network_type = config.network_type;
         let interface = config.interface.clone();
         let data_format = config.data_format;
-        let csv_send_interval = config.csv_send_interval;
+        let csv_packet_interval =
+            config.csv_packet_interval;
 
         // 重置统计信息
         if let Ok(mut stats_guard) = stats.lock() {
@@ -95,7 +85,7 @@ impl TransferService {
                 network_type,
                 interface,
                 data_format,
-                csv_send_interval,
+                csv_packet_interval,
                 stats,
                 transfer_state_clone,
             )
@@ -131,16 +121,7 @@ impl TransferService {
         runtime_handle: &tokio::runtime::Handle,
     ) -> Result<Arc<Mutex<TransferState>>> {
         // 保存当前配置到配置管理器
-        self.config_manager.update_receiver_network_config(
-            config.address.clone(),
-            config.port,
-            config.network_type,
-            config.interface.clone(),
-        );
-        self.config_manager.update_receiver_config(
-            config.output_path.clone(),
-            config.dataset_name.clone(),
-        );
+        self.config_manager.update_receiver_config(config);
         if let Err(e) = self.config_manager.save() {
             tracing::warn!("Failed to save config: {}", e);
         }

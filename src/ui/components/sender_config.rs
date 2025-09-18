@@ -55,20 +55,22 @@ fn render_data_format_combo(
     enabled: bool,
 ) {
     ui.add_enabled_ui(enabled, |ui| {
-        egui::ComboBox::from_id_salt("sender_data_format_combo")
-            .selected_text(format!("{:?}", data_format))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    data_format,
-                    DataFormat::PCAP,
-                    "PCAP",
-                );
-                ui.selectable_value(
-                    data_format,
-                    DataFormat::CSV,
-                    "CSV",
-                );
-            });
+        egui::ComboBox::from_id_salt(
+            "sender_data_format_combo",
+        )
+        .selected_text(format!("{}", data_format))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(
+                data_format,
+                DataFormat::Pcap,
+                format!("{}", DataFormat::Pcap),
+            );
+            ui.selectable_value(
+                data_format,
+                DataFormat::Csv,
+                format!("{}", DataFormat::Csv),
+            );
+        });
     });
 }
 
@@ -79,25 +81,27 @@ fn render_network_type_combo(
     enabled: bool,
 ) {
     ui.add_enabled_ui(enabled, |ui| {
-        egui::ComboBox::from_id_salt("sender_network_type_combo")
-            .selected_text(format!("{:?}", network_type))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Unicast,
-                    "Unicast",
-                );
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Multicast,
-                    "Multicast",
-                );
-                ui.selectable_value(
-                    network_type,
-                    NetworkType::Broadcast,
-                    "Broadcast",
-                );
-            });
+        egui::ComboBox::from_id_salt(
+            "sender_network_type_combo",
+        )
+        .selected_text(format!("{:?}", network_type))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(
+                network_type,
+                NetworkType::Unicast,
+                "Unicast",
+            );
+            ui.selectable_value(
+                network_type,
+                NetworkType::Multicast,
+                "Multicast",
+            );
+            ui.selectable_value(
+                network_type,
+                NetworkType::Broadcast,
+                "Broadcast",
+            );
+        });
     });
 }
 
@@ -123,7 +127,7 @@ pub fn render_sender_config(
 
             // 根据数据格式显示对应的路径输入框
             match config.data_format {
-                DataFormat::PCAP => {
+                DataFormat::Pcap => {
                     ui.label("PCAP Path");
                     ui.add_enabled(
                         enabled,
@@ -133,7 +137,7 @@ pub fn render_sender_config(
                     );
                     ui.end_row();
                 }
-                DataFormat::CSV => {
+                DataFormat::Csv => {
                     ui.label("CSV File");
                     ui.add_enabled(
                         enabled,
@@ -143,11 +147,11 @@ pub fn render_sender_config(
                     );
                     ui.end_row();
 
-                    ui.label("Send Interval");
+                    ui.label("Packet Interval");
                     ui.add_enabled(
                         enabled,
                         egui::DragValue::new(
-                            &mut config.csv_send_interval,
+                            &mut config.csv_packet_interval,
                         )
                         .range(1..=60000) // 1毫秒到60秒
                         .suffix(" ms"),
