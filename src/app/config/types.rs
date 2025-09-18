@@ -4,9 +4,18 @@ use std::path::PathBuf;
 use crate::app::error::types::Result;
 use crate::utils::helpers::{
     ensure_output_directory, is_broadcast_address,
-    is_multicast_address, validate_dataset_path,
-    validate_ip_address, validate_port,
+    is_multicast_address, validate_ip_address,
+    validate_pcap_path, validate_port,
 };
+
+/// 数据格式类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataFormat {
+    /// PCAP数据集格式
+    PCAP,
+    /// CSV数据格式
+    CSV,
+}
 
 /// 网络类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +33,7 @@ pub enum NetworkType {
 pub struct SenderAppConfig {
     pub network: NetworkConfig,
     pub dataset_path: PathBuf,
+    pub data_format: DataFormat,
 }
 
 /// 接收器应用程序配置
@@ -108,6 +118,7 @@ impl SenderAppConfig {
         port: u16,
         network_type: NetworkType,
         interface: Option<String>,
+        data_format: DataFormat,
     ) -> Result<Self> {
         let network = NetworkConfig::for_sender(
             address,
@@ -115,18 +126,60 @@ impl SenderAppConfig {
             network_type,
             interface,
         )?;
-        validate_dataset_path(&dataset_path)?;
+
+        // 根据数据格式验证路径
+        match data_format {
+            DataFormat::PCAP => {
+                validate_pcap_path(&dataset_path)?;
+            }
+            DataFormat::CSV => {
+                if !dataset_path.exists() {
+                    return Err(crate::app::error::types::DataTransferError::validation(
+                        "CSV File",
+                        format!("CSV file does not exist: {}", dataset_path.display())
+                    ));
+                }
+                if !dataset_path.is_file() {
+                    return Err(crate::app::error::types::DataTransferError::validation(
+                        "CSV File",
+                        format!("Path must be a file: {}", dataset_path.display())
+                    ));
+                }
+            }
+        }
 
         Ok(Self {
             network,
             dataset_path,
+            data_format,
         })
     }
 
     /// 验证整个配置
     pub fn validate(&self) -> Result<()> {
         self.network.validate()?;
-        validate_dataset_path(&self.dataset_path)?;
+
+        // 根据数据格式验证路径
+        match self.data_format {
+            DataFormat::PCAP => {
+                validate_pcap_path(&self.dataset_path)?;
+            }
+            DataFormat::CSV => {
+                if !self.dataset_path.exists() {
+                    return Err(crate::app::error::types::DataTransferError::validation(
+                        "CSV File",
+                        format!("CSV file does not exist: {}", self.dataset_path.display())
+                    ));
+                }
+                if !self.dataset_path.is_file() {
+                    return Err(crate::app::error::types::DataTransferError::validation(
+                        "CSV File",
+                        format!("Path must be a file: {}", self.dataset_path.display())
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 }

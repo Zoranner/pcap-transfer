@@ -39,19 +39,31 @@ impl TransferService {
             config.network_type,
             config.interface.clone(),
         );
-        self.config_manager.update_sender_config(
-            config.dataset_path.clone(),
-        );
+        // 保存PCAP路径（主要路径，用于兼容现有配置系统）
+        self.config_manager
+            .update_sender_config(config.pcap_path.clone());
+        // 保存CSV配置
+        self.config_manager
+            .update_csv_config(config.csv_file.clone(), config.csv_send_interval);
         if let Err(e) = self.config_manager.save() {
             tracing::warn!("Failed to save config: {}", e);
         }
 
-        let dataset_path =
-            std::path::PathBuf::from(&config.dataset_path);
+        // 根据数据格式选择对应的路径
+        let dataset_path = match config.data_format {
+            crate::app::config::types::DataFormat::PCAP => {
+                std::path::PathBuf::from(&config.pcap_path)
+            }
+            crate::app::config::types::DataFormat::CSV => {
+                std::path::PathBuf::from(&config.csv_file)
+            }
+        };
         let address = config.address.clone();
         let port = config.port;
         let network_type = config.network_type;
         let interface = config.interface.clone();
+        let data_format = config.data_format;
+        let csv_send_interval = config.csv_send_interval;
 
         // 重置统计信息
         if let Ok(mut stats_guard) = stats.lock() {
@@ -82,6 +94,8 @@ impl TransferService {
                 port,
                 network_type,
                 interface,
+                data_format,
+                csv_send_interval,
                 stats,
                 transfer_state_clone,
             )

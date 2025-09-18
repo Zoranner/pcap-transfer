@@ -20,17 +20,17 @@ pub fn validate_port(port: u16) -> Result<u16> {
 }
 
 /// 检查数据集路径是否存在
-pub fn validate_dataset_path(path: &Path) -> Result<()> {
+pub fn validate_pcap_path(path: &Path) -> Result<()> {
     if !path.exists() {
         anyhow::bail!(
-            "Dataset path does not exist: {}",
+            "PCAP Path does not exist: {}",
             path.display()
         );
     }
 
     if !path.is_dir() {
         anyhow::bail!(
-            "Dataset path must be a directory: {}",
+            "PCAP Path must be a directory: {}",
             path.display()
         );
     }

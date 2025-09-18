@@ -1,16 +1,16 @@
 //! 发送器模块 - 处理数据包发送逻辑
 
 use crate::app::config::types::{
-    NetworkType, SenderAppConfig,
+    DataFormat, NetworkType, SenderAppConfig,
 };
 use crate::app::error::types::Result;
+use crate::core::csv::CsvParser;
 use crate::core::network::types::UdpSocketFactory;
 use crate::core::stats::collector::TransferStats;
 use crate::core::timing::utils::TimingController;
 use pcapfile_io::{PcapReader, ReaderConfig};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tokio::time::{sleep, Duration};
 use tracing::error;
 
 /// 传输状态枚举
@@ -30,6 +30,8 @@ pub async fn run_sender_with_gui_stats(
     port: u16,
     network_type: NetworkType,
     interface: Option<String>,
+    data_format: DataFormat,
+    csv_send_interval: u64, // CSV发送周期（毫秒）
     stats: Arc<Mutex<TransferStats>>,
     transfer_state: Arc<Mutex<TransferState>>,
 ) -> Result<()> {
@@ -40,6 +42,7 @@ pub async fn run_sender_with_gui_stats(
         port,
         network_type,
         interface,
+        data_format,
     )?;
 
     // 验证配置
@@ -49,22 +52,6 @@ pub async fn run_sender_with_gui_stats(
     let socket =
         UdpSocketFactory::create_sender(&config.network)
             .await?;
-
-    // 创建pcap读取器
-    let dataset_path = &config.dataset_path;
-    let dataset_name = dataset_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("dataset");
-
-    let mut reader = PcapReader::new_with_config(
-        dataset_path.parent().unwrap_or(dataset_path),
-        dataset_name,
-        ReaderConfig::default(),
-    )?;
-
-    // 获取数据集信息
-    let _dataset_info = reader.get_dataset_info()?;
 
     // 初始化时序控制器（始终启用精确时序控制）
     let mut timing_controller = TimingController::new();
@@ -80,47 +67,199 @@ pub async fn run_sender_with_gui_stats(
         config.network.address, config.network.port
     );
 
-    // 统计信息
-
     // 基于时间的停止状态检查
     let mut last_stop_check = std::time::Instant::now();
-    let stop_check_interval = std::time::Duration::from_millis(100);
-    
-    // 读取并发送数据包
-    while let Some(packet) = reader.read_packet()? {
-        // 每100ms检查一次停止状态
-        if last_stop_check.elapsed() >= stop_check_interval {
-            if let Ok(state) = transfer_state.lock() {
-                if matches!(*state, TransferState::Idle) {
-                    tracing::info!("Sender received stop signal, breaking loop");
-                    break;
+    let stop_check_interval =
+        std::time::Duration::from_millis(100);
+
+    // 根据数据格式选择不同的处理方式
+    match config.data_format {
+        DataFormat::PCAP => {
+            // PCAP数据集处理
+            let dataset_path = &config.dataset_path;
+            let dataset_name = dataset_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("dataset");
+
+            let mut reader = PcapReader::new_with_config(
+                dataset_path
+                    .parent()
+                    .unwrap_or(dataset_path),
+                dataset_name,
+                ReaderConfig::default(),
+            )?;
+
+            // 获取数据集信息
+            let _dataset_info =
+                reader.get_dataset_info()?;
+
+            // 读取并发送数据包
+            while let Some(packet) = reader.read_packet()? {
+                // 每100ms检查一次停止状态
+                if last_stop_check.elapsed()
+                    >= stop_check_interval
+                {
+                    if let Ok(state) = transfer_state.lock()
+                    {
+                        if matches!(
+                            *state,
+                            TransferState::Idle
+                        ) {
+                            tracing::info!("Sender received stop signal, breaking loop");
+                            break;
+                        }
+                    }
+                    last_stop_check =
+                        std::time::Instant::now();
+                }
+
+                let packet_data = &packet.packet.data;
+                let packet_time = packet.capture_time();
+
+                // 时序控制（精确重放）
+                timing_controller
+                    .wait_for_packet_time(packet_time)
+                    .await;
+
+                // 发送数据包
+                match socket
+                    .send_to(packet_data, &target_addr)
+                    .await
+                {
+                    Ok(bytes_sent) => {
+                        // 立即更新统计信息
+                        if let Ok(mut stats_guard) =
+                            stats.lock()
+                        {
+                            stats_guard
+                                .update_with_timestamp(
+                                    bytes_sent,
+                                    packet_time,
+                                );
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to send packet: {}",
+                            e
+                        );
+
+                        // 立即更新错误统计
+                        if let Ok(mut stats_guard) =
+                            stats.lock()
+                        {
+                            stats_guard.add_error();
+                        }
+                    }
                 }
             }
-            last_stop_check = std::time::Instant::now();
         }
+        DataFormat::CSV => {
+            // CSV数据处理
+            let csv_parser =
+                CsvParser::from_file(&config.dataset_path)?;
+            let row_count = csv_parser.row_count();
 
-        let packet_data = &packet.packet.data;
-        let packet_time = packet.capture_time();
+            tracing::info!("CSV file loaded: {} rows, send interval: {}ms", row_count, csv_send_interval);
 
-        // 时序控制（精确重放）
-        timing_controller
-            .wait_for_packet_time(packet_time)
-            .await;
-
-        // 发送数据包
-        match socket.send_to(packet_data, &target_addr).await {
-            Ok(bytes_sent) => {
-                // 立即更新统计信息
-                if let Ok(mut stats_guard) = stats.lock() {
-                    stats_guard.update_with_timestamp(bytes_sent, packet_time);
+            // 发送CSV数据包
+            for row_index in 0..row_count {
+                // 每100ms检查一次停止状态
+                if last_stop_check.elapsed()
+                    >= stop_check_interval
+                {
+                    if let Ok(state) = transfer_state.lock()
+                    {
+                        if matches!(
+                            *state,
+                            TransferState::Idle
+                        ) {
+                            tracing::info!("Sender received stop signal, breaking loop");
+                            break;
+                        }
+                    }
+                    last_stop_check =
+                        std::time::Instant::now();
                 }
-            }
-            Err(e) => {
-                error!("Failed to send packet: {}", e);
 
-                // 立即更新错误统计
-                if let Ok(mut stats_guard) = stats.lock() {
-                    stats_guard.add_error();
+                // 生成数据包
+                let csv_packet = csv_parser
+                    .generate_packet(row_index)?;
+                let packet_data = &csv_packet.data;
+                let packet_time = csv_packet.timestamp;
+
+                // 打印发送的数据到控制台
+                println!("Row {}: {} bytes", row_index, packet_data.len());
+                println!("  Raw bytes: {:?}", packet_data);
+                
+                // 尝试解析并显示数据内容
+                if packet_data.len() >= 4 {
+                    // 显示前几个字节作为示例
+                    let mut offset = 0;
+                    if packet_data.len() > offset + 4 {
+                        let cmd_code = u32::from_le_bytes([
+                            packet_data[offset], packet_data[offset+1], 
+                            packet_data[offset+2], packet_data[offset+3]
+                        ]);
+                        println!("  Command Code: 0x{:04X}", cmd_code);
+                        offset += 4;
+                    }
+                    
+                    // 显示一些f32值
+                    for i in 0..3 {
+                        if packet_data.len() > offset + 4 {
+                            let float_val = f32::from_le_bytes([
+                                packet_data[offset], packet_data[offset+1], 
+                                packet_data[offset+2], packet_data[offset+3]
+                            ]);
+                            println!("  Float {}: {:.6}", i, float_val);
+                            offset += 4;
+                        }
+                    }
+                }
+                tracing::info!("Sending row {}: {} bytes", row_index, packet_data.len());
+
+                // 发送数据包
+                match socket
+                    .send_to(packet_data, &target_addr)
+                    .await
+                {
+                    Ok(bytes_sent) => {
+                        // 立即更新统计信息
+                        if let Ok(mut stats_guard) =
+                            stats.lock()
+                        {
+                            stats_guard
+                                .update_with_timestamp(
+                                    bytes_sent,
+                                    packet_time,
+                                );
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to send packet: {}",
+                            e
+                        );
+
+                        // 立即更新错误统计
+                        if let Ok(mut stats_guard) =
+                            stats.lock()
+                        {
+                            stats_guard.add_error();
+                        }
+                    }
+                }
+
+                // CSV数据发送间隔控制（除了最后一行）
+                if row_index < row_count - 1 {
+                    tokio::time::sleep(
+                        tokio::time::Duration::from_millis(
+                            csv_send_interval,
+                        ),
+                    )
+                    .await;
                 }
             }
         }

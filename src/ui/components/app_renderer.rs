@@ -52,8 +52,9 @@ impl AppRenderer {
                 ui.separator();
                 ui.add_space(8.0);
 
-                // 配置区域
-                crate::ui::components::render_sender_config(ui, config);
+                // 配置区域 - 在传输过程中禁用配置修改
+                let config_enabled = !matches!(transfer_state, TransferState::Running);
+                crate::ui::components::render_sender_config(ui, config, config_enabled);
 
                 ui.add_space(20.0);
 
@@ -91,8 +92,9 @@ impl AppRenderer {
                 ui.separator();
                 ui.add_space(8.0);
 
-                // 配置区域
-                crate::ui::components::render_receiver_config(ui, config);
+                // 配置区域 - 在传输过程中禁用配置修改
+                let config_enabled = !matches!(transfer_state, TransferState::Running);
+                crate::ui::components::render_receiver_config(ui, config, config_enabled);
 
                 ui.add_space(20.0);
 

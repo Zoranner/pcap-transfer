@@ -2,7 +2,7 @@
 //!
 //! 定义GUI应用程序的配置结构体和枚举类型。
 
-use crate::app::config::types::NetworkType;
+use crate::app::config::types::{DataFormat, NetworkType};
 
 /// 当前选中的标签页
 #[derive(Debug, Clone, PartialEq)]
@@ -20,7 +20,10 @@ impl Default for SelectedTab {
 /// 发送器配置
 #[derive(Debug, Clone)]
 pub struct SenderConfig {
-    pub dataset_path: String, // 改为String以匹配配置管理器
+    pub data_format: DataFormat,
+    pub pcap_path: String, // PCAP数据集路径（文件夹）
+    pub csv_file: String,  // CSV文件路径（文件）
+    pub csv_send_interval: u64, // CSV发送周期（毫秒）
     pub address: String,
     pub port: u16,
     pub network_type: NetworkType,
@@ -30,7 +33,10 @@ pub struct SenderConfig {
 impl Default for SenderConfig {
     fn default() -> Self {
         Self {
-            dataset_path: String::new(),
+            data_format: DataFormat::PCAP,
+            pcap_path: String::new(),
+            csv_file: String::new(),
+            csv_send_interval: 1000, // 默认1秒（1000毫秒）
             address: "127.0.0.1".to_string(),
             port: 8080,
             network_type: NetworkType::Unicast,

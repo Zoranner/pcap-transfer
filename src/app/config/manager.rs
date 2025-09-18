@@ -28,6 +28,8 @@ pub struct NetworkConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SenderConfig {
     pub dataset_path: String,
+    pub csv_file: String, // CSV文件路径
+    pub csv_send_interval: u64, // CSV发送周期（毫秒）
     pub network: NetworkConfig,
 }
 
@@ -35,6 +37,8 @@ impl Default for SenderConfig {
     fn default() -> Self {
         Self {
             dataset_path: "./dataset".to_string(),
+            csv_file: String::new(), // CSV文件路径默认为空
+            csv_send_interval: 1000, // 默认1秒发送周期
             network: NetworkConfig::default(),
         }
     }
@@ -255,6 +259,12 @@ impl ConfigManager {
         dataset_path: String,
     ) {
         self.config.sender.dataset_path = dataset_path;
+    }
+
+    /// 更新CSV配置
+    pub fn update_csv_config(&mut self, csv_file: String, csv_send_interval: u64) {
+        self.config.sender.csv_file = csv_file;
+        self.config.sender.csv_send_interval = csv_send_interval;
     }
 
     /// 更新接收器配置

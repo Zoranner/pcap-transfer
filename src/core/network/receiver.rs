@@ -84,7 +84,7 @@ pub async fn run_receiver_with_gui_stats(
                         // 写入数据包
                         if let Err(e) = writer.write_packet(&packet) {
                             error!("Failed to write packet: {}", e);
-                            
+
                             // 立即更新错误统计
                             if let Ok(mut stats_guard) = stats.lock() {
                                 stats_guard.add_error();
@@ -98,7 +98,7 @@ pub async fn run_receiver_with_gui_stats(
                     }
                     Err(e) => {
                         error!("Failed to create packet: {}", e);
-                        
+
                         // 立即更新错误统计
                         if let Ok(mut stats_guard) = stats.lock() {
                             stats_guard.add_error();
@@ -108,7 +108,7 @@ pub async fn run_receiver_with_gui_stats(
                     }
                     Err(e) => {
                         error!("Failed to receive packet: {}", e);
-                        
+
                         // 立即更新错误统计
                         if let Ok(mut stats_guard) = stats.lock() {
                             stats_guard.add_error();

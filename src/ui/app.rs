@@ -62,10 +62,11 @@ impl Default for DataTransferApp {
         // 从配置管理器初始化GUI配置
         let config = config_manager.config();
         let sender_config = SenderConfig {
-            dataset_path: config
-                .sender
-                .dataset_path
-                .clone(),
+            data_format:
+                crate::app::config::types::DataFormat::PCAP, // 默认使用PCAP格式
+            pcap_path: config.sender.dataset_path.clone(),
+            csv_file: config.sender.csv_file.clone(), // 从配置中加载CSV文件路径
+            csv_send_interval: config.sender.csv_send_interval, // 从配置中加载发送周期
             address: config.sender.network.address.clone(),
             port: config.sender.network.port,
             network_type: config_manager
