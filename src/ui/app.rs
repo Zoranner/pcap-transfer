@@ -337,7 +337,61 @@ impl eframe::App for DataTransferApp {
                 ui.add_space(8.0);
             });
 
-        // 主内容区域
+        // 底部状态栏 - 先渲染状态栏
+        egui::TopBottomPanel::bottom("status_bar")
+            .resizable(false)
+            .exact_height(30.0)
+            .show(ctx, |ui| {
+                ui.horizontal_centered(|ui| {
+                    // 左侧状态信息
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        match self.selected_tab {
+                            SelectedTab::Sender => {
+                                match &self.sender_transfer_state {
+                                    TransferState::Idle => {
+                                        ui.colored_label(egui::Color32::GRAY, "Sender: Idle");
+                                    }
+                                    TransferState::Running => {
+                                        ui.colored_label(egui::Color32::GREEN, "Sender: Running");
+                                    }
+                                    TransferState::Completed => {
+                                        ui.colored_label(egui::Color32::GRAY, "Sender: Idle");
+                                    }
+                                    TransferState::Error(_) => {
+                                        ui.colored_label(egui::Color32::RED, "Sender: Error");
+                                    }
+                                }
+                            }
+                            SelectedTab::Receiver => {
+                                match &self.receiver_transfer_state {
+                                    TransferState::Idle => {
+                                        ui.colored_label(egui::Color32::GRAY, "Receiver: Idle");
+                                    }
+                                    TransferState::Running => {
+                                        ui.colored_label(egui::Color32::GREEN, "Receiver: Running");
+                                    }
+                                    TransferState::Completed => {
+                                        ui.colored_label(egui::Color32::GRAY, "Receiver: Idle");
+                                    }
+                                    TransferState::Error(_) => {
+                                        ui.colored_label(egui::Color32::RED, "Receiver: Error");
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // 右侧版本号
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.colored_label(
+                            egui::Color32::GRAY,
+                            format!("v{}", env!("CARGO_PKG_VERSION"))
+                        );
+                    });
+                });
+            });
+
+        // 主内容区域 - 后渲染主内容区域
         egui::CentralPanel::default().show(ctx, |ui| {
             // 根据选中的标签页渲染对应内容
             match self.selected_tab {
