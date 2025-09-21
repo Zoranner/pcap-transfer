@@ -464,11 +464,13 @@ impl eframe::App for DataTransferApp {
 
 /// 启动 GUI 应用程序
 pub fn run_gui() -> Result<()> {
+    let title = "Pcap Transfer";
+
     let viewport_builder = egui::ViewportBuilder::default()
-        .with_inner_size([400.0, 500.0])
-        .with_min_inner_size([300.0, 500.0])
+        .with_inner_size([400.0, 520.0])
+        .with_min_inner_size([400.0, 520.0])
         .with_resizable(true)
-        .with_title("Pcap Transfer");
+        .with_title(title);
 
     let options = eframe::NativeOptions {
         viewport: viewport_builder,
@@ -482,7 +484,7 @@ pub fn run_gui() -> Result<()> {
     let runtime_handle = tokio::runtime::Handle::current();
 
     eframe::run_native(
-        "Pcap Transfer",
+        title,
         options,
         Box::new(move |cc| {
             let mut app = DataTransferApp::new(cc);
