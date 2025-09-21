@@ -45,3 +45,11 @@ rfd = "0.14" # 文件对话框
 
 [features]
 default = []
+
+[lib]
+name = "pcap_transfer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pcap-transfer"
+path = "src/main.rs"
