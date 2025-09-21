@@ -1,5 +1,6 @@
 //! CSV数据类型定义
 
+use crate::core::csv::expr::DefaultExpr;
 use std::fmt;
 
 /// CSV数据类型枚举
@@ -27,49 +28,41 @@ pub enum CsvDataType {
     F64,
     /// 布尔值
     Bool,
-    /// 十六进制值（固定值）
-    HexFixed(Vec<u8>),
-    /// 十六进制值（动态值）
+    /// 十六进制值（固定长度）
     HexDynamic(usize),
 }
 
 impl CsvDataType {
-    /// 从字符串解析数据类型
-    pub fn from_string(
+    /// 基于列头定义解析出基础类型与默认表达式
+    pub fn parse_type_and_default(
         type_str: &str,
-    ) -> Result<Self, String> {
-        match type_str.trim() {
-            "i8" => Ok(CsvDataType::I8),
-            "i16" => Ok(CsvDataType::I16),
-            "i32" => Ok(CsvDataType::I32),
-            "i64" => Ok(CsvDataType::I64),
-            "u8" => Ok(CsvDataType::U8),
-            "u16" => Ok(CsvDataType::U16),
-            "u32" => Ok(CsvDataType::U32),
-            "u64" => Ok(CsvDataType::U64),
-            "f32" => Ok(CsvDataType::F32),
-            "f64" => Ok(CsvDataType::F64),
-            "bool" => Ok(CsvDataType::Bool),
-            s if s.starts_with("hex=") => {
-                let hex_value = &s[4..];
-                let bytes = parse_hex_string(hex_value)?;
-                Ok(CsvDataType::HexFixed(bytes))
-            }
-            s if s.starts_with("hex_")
-                && s.contains('=') =>
-            {
-                let parts: Vec<&str> =
-                    s.split('=').collect();
-                if parts.len() != 2 {
-                    return Err(format!(
-                        "Invalid hex format: {}",
-                        s
-                    ));
-                }
-                let size_part = parts[0];
-                let hex_value = parts[1];
+    ) -> Result<(Self, Option<DefaultExpr>), String> {
+        let s = type_str.trim();
+        // 拆分 base=expr 形式；注意 hex_N=... 作为 base 是允许的
+        let (base, expr_opt) =
+            if let Some(eq_idx) = s.find('=') {
+                let (b, rest) = s.split_at(eq_idx);
+                let expr = &rest[1..];
+                (b.trim(), Some(expr.trim()))
+            } else {
+                (s, None)
+            };
 
-                let size_str = &size_part[4..];
+        // 先解析基础类型（不考虑 = 右侧的内容）
+        let base_ty = match base {
+            "i8" => CsvDataType::I8,
+            "i16" => CsvDataType::I16,
+            "i32" => CsvDataType::I32,
+            "i64" => CsvDataType::I64,
+            "u8" => CsvDataType::U8,
+            "u16" => CsvDataType::U16,
+            "u32" => CsvDataType::U32,
+            "u64" => CsvDataType::U64,
+            "f32" => CsvDataType::F32,
+            "f64" => CsvDataType::F64,
+            "bool" => CsvDataType::Bool,
+            b if b.starts_with("hex_") => {
+                let size_str = &b[4..];
                 let size: usize =
                     size_str.parse().map_err(|_| {
                         format!(
@@ -77,52 +70,52 @@ impl CsvDataType {
                             size_str
                         )
                     })?;
+                CsvDataType::HexDynamic(size)
+            }
+            "hex" => CsvDataType::HexDynamic(1),
+            _ => {
+                return Err(format!(
+                    "Unknown data type: {}",
+                    base
+                ))
+            }
+        };
 
-                let bytes = parse_hex_string(hex_value)?;
-                if bytes.len() != size {
-                    return Err(format!("Hex value length {} doesn't match specified size {}", bytes.len(), size));
+        // 解析默认表达式（若存在）
+        let default_expr = if let Some(expr) = expr_opt {
+            // DefaultExpr::parse 返回 Result<_, String>，此处转换为 String 仍然符合当前错误类型
+            Some(
+                DefaultExpr::parse(expr, &base_ty)
+                    .map_err(|e| e.to_string())?,
+            )
+        } else {
+            None
+        };
+
+        // 若是 hex 且给了字面量默认值，需要推导长度
+        let final_ty = match (&base_ty, &default_expr) {
+            (
+                CsvDataType::HexDynamic(size),
+                Some(DefaultExpr::Literal(s)),
+            ) => {
+                // 尝试按 hex 解析以推导长度；如 header 为 hex 而非 hex_N，让长度以字面量为准
+                if *size == 1 {
+                    if let Ok(bytes) = parse_hex_string(s) {
+                        CsvDataType::HexDynamic(bytes.len())
+                    } else {
+                        base_ty.clone()
+                    }
+                } else {
+                    base_ty.clone()
                 }
-                Ok(CsvDataType::HexFixed(bytes))
             }
-            s if s.starts_with("hex_") => {
-                let size_str = &s[4..];
-                let size: usize =
-                    size_str.parse().map_err(|_| {
-                        format!(
-                            "Invalid hex size: {}",
-                            size_str
-                        )
-                    })?;
-                Ok(CsvDataType::HexDynamic(size))
-            }
-            "hex" => Ok(CsvDataType::HexDynamic(1)),
-            _ => Err(format!(
-                "Unknown data type: {}",
-                type_str
-            )),
-        }
-    }
+            _ => base_ty.clone(),
+        };
 
-    /// 获取数据类型的字节大小
-    #[allow(dead_code)]
-    pub fn byte_size(&self) -> usize {
-        match self {
-            CsvDataType::I8 | CsvDataType::U8 => 1,
-            CsvDataType::I16 | CsvDataType::U16 => 2,
-            CsvDataType::I32
-            | CsvDataType::U32
-            | CsvDataType::F32 => 4,
-            CsvDataType::I64
-            | CsvDataType::U64
-            | CsvDataType::F64 => 8,
-            CsvDataType::Bool => 1,
-            CsvDataType::HexFixed(bytes) => bytes.len(),
-            CsvDataType::HexDynamic(size) => *size,
-        }
+        Ok((final_ty, default_expr))
     }
 
     /// 获取默认值
-    #[allow(dead_code)]
     pub fn default_value(&self) -> Vec<u8> {
         match self {
             CsvDataType::I8 => vec![0],
@@ -142,7 +135,6 @@ impl CsvDataType {
                 vec![0, 0, 0, 0, 0, 0, 0, 0]
             }
             CsvDataType::Bool => vec![0],
-            CsvDataType::HexFixed(bytes) => bytes.clone(),
             CsvDataType::HexDynamic(size) => vec![0; *size],
         }
     }
@@ -165,14 +157,6 @@ impl fmt::Display for CsvDataType {
             CsvDataType::F32 => write!(f, "f32"),
             CsvDataType::F64 => write!(f, "f64"),
             CsvDataType::Bool => write!(f, "bool"),
-            CsvDataType::HexFixed(bytes) => {
-                let hex_str = bytes
-                    .iter()
-                    .map(|b| format!("{:02X}", b))
-                    .collect::<Vec<_>>()
-                    .join("");
-                write!(f, "hex=0x{}", hex_str)
-            }
             CsvDataType::HexDynamic(size) => {
                 write!(f, "hex_{}", size)
             }
@@ -183,9 +167,8 @@ impl fmt::Display for CsvDataType {
 /// CSV列定义
 #[derive(Debug, Clone)]
 pub struct CsvColumn {
-    #[allow(dead_code)]
-    pub name: String,
     pub data_type: CsvDataType,
+    pub default_expr: Option<DefaultExpr>,
 }
 
 /// CSV数据包定义
@@ -196,7 +179,7 @@ pub struct CsvPacket {
 }
 
 /// 解析十六进制字符串
-fn parse_hex_string(
+pub fn parse_hex_string(
     hex_str: &str,
 ) -> Result<Vec<u8>, String> {
     let hex_str = hex_str.trim();
@@ -241,28 +224,24 @@ mod tests {
 
     #[test]
     fn test_parse_data_types() {
-        assert_eq!(
-            CsvDataType::from_string("i32").unwrap(),
-            CsvDataType::I32
-        );
-        assert_eq!(
-            CsvDataType::from_string("f32").unwrap(),
-            CsvDataType::F32
-        );
-        assert_eq!(
-            CsvDataType::from_string("bool").unwrap(),
-            CsvDataType::Bool
-        );
+        let (i32_type, _) =
+            CsvDataType::parse_type_and_default("i32")
+                .unwrap();
+        assert_eq!(i32_type, CsvDataType::I32);
 
-        let hex_fixed =
-            CsvDataType::from_string("hex=0xFF").unwrap();
-        assert_eq!(
-            hex_fixed,
-            CsvDataType::HexFixed(vec![0xFF])
-        );
+        let (f32_type, _) =
+            CsvDataType::parse_type_and_default("f32")
+                .unwrap();
+        assert_eq!(f32_type, CsvDataType::F32);
 
-        let hex_dynamic =
-            CsvDataType::from_string("hex_4").unwrap();
+        let (bool_type, _) =
+            CsvDataType::parse_type_and_default("bool")
+                .unwrap();
+        assert_eq!(bool_type, CsvDataType::Bool);
+
+        let (hex_dynamic, _) =
+            CsvDataType::parse_type_and_default("hex_4")
+                .unwrap();
         assert_eq!(hex_dynamic, CsvDataType::HexDynamic(4));
     }
 

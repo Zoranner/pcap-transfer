@@ -2075,6 +2075,7 @@ dependencies = [
  "futures",
  "path-absolutize",
  "pcapfile-io",
+ "rand",
  "rfd",
  "serde",
  "socket2 0.5.10",

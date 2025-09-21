@@ -94,7 +94,9 @@ impl ConfigManager {
     ///
     /// # 示例
     /// ```
-    /// let config_manager = ConfigManager::new("pcap-transfer")?;
+    /// use pcap_transfer::app::config::manager::ConfigManager;
+    /// let config_manager = ConfigManager::new("pcap-transfer").unwrap();
+    /// assert!(config_manager.config().sender.csv_packet_interval >= 0);
     /// ```
     pub fn new(project_name: &str) -> Result<Self> {
         let config_paths = ConfigPaths::new(project_name)?;

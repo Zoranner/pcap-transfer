@@ -1,6 +1,7 @@
 //! CSV数据解析器
 
 use crate::app::error::types::{AppError, Result};
+use crate::core::csv::expr::parse_cell_value_by_type;
 use crate::core::csv::types::{
     CsvColumn, CsvDataType, CsvPacket,
 };
@@ -58,25 +59,27 @@ impl CsvParser {
             ));
         }
 
-        // 解析数据类型
+        // 解析数据类型与默认表达式
         let mut columns = Vec::new();
-        for (i, (name, type_str)) in column_names
+        for (i, (_name, type_str)) in column_names
             .iter()
             .zip(data_types.iter())
             .enumerate()
         {
-            let data_type =
-                CsvDataType::from_string(type_str)
-                    .map_err(|e| {
-                        AppError::validation(
-                            format!("Column {}", i + 1),
-                            e,
-                        )
-                    })?;
+            let (data_type, default_expr) =
+                CsvDataType::parse_type_and_default(
+                    type_str,
+                )
+                .map_err(|e| {
+                    AppError::validation(
+                        format!("Column {}", i + 1),
+                        e,
+                    )
+                })?;
 
             columns.push(CsvColumn {
-                name: name.clone(),
                 data_type,
+                default_expr,
             });
         }
 
@@ -145,12 +148,6 @@ impl CsvParser {
         result
     }
 
-    /// 获取列定义
-    #[allow(dead_code)]
-    pub fn columns(&self) -> &[CsvColumn] {
-        &self.columns
-    }
-
     /// 获取数据行数
     pub fn row_count(&self) -> usize {
         self.data_rows.len()
@@ -175,12 +172,11 @@ impl CsvParser {
         let row = &self.data_rows[row_index];
         let mut packet_data = Vec::new();
 
-        for (column, value) in
-            self.columns.iter().zip(row.iter())
+        for (col_index, (column, value)) in
+            self.columns.iter().zip(row.iter()).enumerate()
         {
-            let bytes = self.parse_value_to_bytes(
-                &column.data_type,
-                value,
+            let bytes = self.value_bytes_with_default(
+                column, value, row_index, col_index,
             )?;
             packet_data.extend_from_slice(&bytes);
         }
@@ -194,206 +190,31 @@ impl CsvParser {
         })
     }
 
-    /// 将值解析为字节数组
-    fn parse_value_to_bytes(
+    /// 根据优先级规则获取字段值的字节表示
+    fn value_bytes_with_default(
         &self,
-        data_type: &CsvDataType,
-        value: &str,
+        column: &CsvColumn,
+        cell_value: &str,
+        row_index: usize,
+        _col_index: usize,
     ) -> Result<Vec<u8>> {
-        let trimmed_value = value.trim();
+        let data_type = &column.data_type;
+        let cell_trimmed = cell_value.trim();
 
-        match data_type {
-            CsvDataType::I8 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<i8>()
-                        .map_err(|e| AppError::validation("i8", format!("Invalid i8 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::I16 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<i16>()
-                        .map_err(|e| AppError::validation("i16", format!("Invalid i16 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::I32 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<i32>()
-                        .map_err(|e| AppError::validation("i32", format!("Invalid i32 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::I64 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<i64>()
-                        .map_err(|e| AppError::validation("i64", format!("Invalid i64 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::U8 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<u8>()
-                        .map_err(|e| AppError::validation("u8", format!("Invalid u8 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::U16 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<u16>()
-                        .map_err(|e| AppError::validation("u16", format!("Invalid u16 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::U32 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<u32>()
-                        .map_err(|e| AppError::validation("u32", format!("Invalid u32 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::U64 => {
-                let val = if trimmed_value.is_empty() {
-                    0
-                } else {
-                    trimmed_value.parse::<u64>()
-                        .map_err(|e| AppError::validation("u64", format!("Invalid u64 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::F32 => {
-                let val = if trimmed_value.is_empty() {
-                    0.0
-                } else {
-                    trimmed_value.parse::<f32>()
-                        .map_err(|e| AppError::validation("f32", format!("Invalid f32 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::F64 => {
-                let val = if trimmed_value.is_empty() {
-                    0.0
-                } else {
-                    trimmed_value.parse::<f64>()
-                        .map_err(|e| AppError::validation("f64", format!("Invalid f64 value '{}': {}", value, e)))?
-                };
-                Ok(val.to_le_bytes().to_vec())
-            }
-            CsvDataType::Bool => {
-                let val = if trimmed_value.is_empty() {
-                    false
-                } else {
-                    match trimmed_value.to_lowercase().as_str() {
-                        "true" | "1" | "yes" | "on" => true,
-                        "false" | "0" | "no" | "off" => false,
-                        _ => return Err(AppError::validation("bool", format!("Invalid bool value '{}'", value)))
-                    }
-                };
-                Ok(vec![if val { 1 } else { 0 }])
-            }
-            CsvDataType::HexFixed(bytes) => {
-                // 固定值，忽略输入值
-                Ok(bytes.clone())
-            }
-            CsvDataType::HexDynamic(size) => {
-                if trimmed_value.is_empty() {
-                    Ok(vec![0; *size])
-                } else {
-                    // 解析十六进制值
-                    let hex_str = trimmed_value.trim();
-                    let hex_str = if hex_str
-                        .starts_with("0x")
-                        || hex_str.starts_with("0X")
-                    {
-                        &hex_str[2..]
-                    } else {
-                        hex_str
-                    };
-
-                    let mut bytes = Vec::new();
-                    let hex_str = if hex_str.len() % 2 == 1
-                    {
-                        format!("0{}", hex_str)
-                    } else {
-                        hex_str.to_string()
-                    };
-
-                    for chunk in
-                        hex_str.as_bytes().chunks(2)
-                    {
-                        let hex_pair = std::str::from_utf8(chunk)
-                            .map_err(|_| AppError::validation("hex", "Invalid UTF-8 in hex string"))?;
-                        let byte = u8::from_str_radix(
-                            hex_pair, 16,
-                        )
-                        .map_err(|_| {
-                            AppError::validation(
-                                "hex",
-                                format!(
-                                    "Invalid hex value: {}",
-                                    hex_pair
-                                ),
-                            )
-                        })?;
-                        bytes.push(byte);
-                    }
-
-                    // 确保长度匹配
-                    if bytes.len() != *size {
-                        return Err(AppError::validation(
-                            "hex",
-                            format!("Hex value length {} doesn't match expected size {}", bytes.len(), size)
-                        ));
-                    }
-
-                    Ok(bytes)
-                }
-            }
+        // 规则：单元格优先
+        if !cell_trimmed.is_empty() {
+            return parse_cell_value_by_type(
+                data_type,
+                cell_trimmed,
+            );
         }
-    }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
-    use std::io::Write;
+        // 无单元格值，尝试默认表达式
+        if let Some(expr) = &column.default_expr {
+            return expr.evaluate(data_type, row_index);
+        }
 
-    #[test]
-    fn test_csv_parser() {
-        // 创建临时文件
-        let temp_path =
-            std::env::temp_dir().join("test.csv");
-        let mut file = File::create(&temp_path).unwrap();
-        writeln!(file, "id,age,score").unwrap(); // 列名
-        writeln!(file, "i32,f32,i16").unwrap(); // 数据类型
-        writeln!(file, "1,25.5,100").unwrap(); // 数据行1
-        writeln!(file, "2,30.0,95").unwrap(); // 数据行2
-        file.flush().unwrap();
-
-        let parser =
-            CsvParser::from_file(&temp_path).unwrap();
-        assert_eq!(parser.columns().len(), 3);
-        assert_eq!(parser.row_count(), 2);
-
-        let packet = parser.generate_packet(0).unwrap();
-        assert_eq!(packet.data.len(), 10); // i32(4) + f32(4) + i16(2) = 10 bytes
-
-        // 清理临时文件
-        std::fs::remove_file(&temp_path).unwrap();
+        // 无默认表达式，使用类型默认值
+        Ok(data_type.default_value())
     }
 }

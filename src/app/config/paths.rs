@@ -21,7 +21,9 @@ impl ConfigPaths {
     ///
     /// # 示例
     /// ```
-    /// let paths = ConfigPaths::new("pcap-transfer");
+    /// use pcap_transfer::app::config::paths::ConfigPaths;
+    /// let paths = ConfigPaths::new("pcap-transfer").unwrap();
+    /// assert!(paths.config_file().to_string_lossy().contains("config.toml"));
     /// ```
     pub fn new(project_name: &str) -> Result<Self> {
         let config_dir =

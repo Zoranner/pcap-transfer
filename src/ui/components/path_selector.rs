@@ -17,16 +17,6 @@ impl<'a> PathSelector<'a> {
             hint_text: None,
         }
     }
-
-    /// 设置提示文本
-    #[allow(dead_code)]
-    pub fn hint_text(
-        mut self,
-        hint: impl Into<String>,
-    ) -> Self {
-        self.hint_text = Some(hint.into());
-        self
-    }
 }
 
 impl<'a> egui::Widget for PathSelector<'a> {

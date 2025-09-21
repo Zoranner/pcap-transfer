@@ -2,6 +2,7 @@
 //!
 //! 负责解析CSV格式的数据文件并生成UDP数据包
 
+pub mod expr;
 pub mod parser;
 pub mod types;
 
