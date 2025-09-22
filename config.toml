@@ -1,0 +1,196 @@
+[sender]
+strategy = "sequential"
+
+[sender.network]
+address = "127.0.0.1"
+port = 8080
+network_type = "unicast"
+interface = ""
+
+[[messages]]
+name = "报文01"
+interval = 1000
+enabled = true
+packet_count = 100
+
+[[messages.fields]]
+name = "通用包头"
+type = "hex_22"
+editable = false
+
+[[messages.fields]]
+name = "命令码"
+type = "i16=8001"
+editable = true
+
+[[messages.fields]]
+name = "信噪比"
+type = "f32=rand(20,30)"
+editable = true
+
+[[messages.fields]]
+name = "估计距离"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "实际角度"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "估计角度"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "真实距离"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "可检测回波数"
+type = "f32=rand(0,20)"
+editable = true
+
+[[messages.fields]]
+name = "总回波数"
+type = "f32=20"
+editable = true
+
+[[messages.fields]]
+name = "程序启动/停止"
+type = "i32=switch(0,-2:1)"
+editable = true
+
+[[messages.fields]]
+name = "发射模式"
+type = "i32=11"
+editable = true
+
+[[messages.fields]]
+name = "gxh"
+type = "i32=0"
+editable = true
+
+[[messages.fields]]
+name = "gzq"
+type = "i32=1"
+editable = true
+
+[[messages]]
+name = "报文02"
+interval = 1000
+enabled = true
+packet_count = 100
+
+[[messages.fields]]
+name = "通用包头"
+type = "hex_22"
+editable = false
+
+[[messages.fields]]
+name = "命令码"
+type = "i16=8001"
+editable = true
+
+[[messages.fields]]
+name = "ms"
+type = "i32=11"
+editable = true
+
+[[messages.fields]]
+name = "fms"
+type = "i32=0"
+editable = true
+
+[[messages.fields]]
+name = "fxh"
+type = "i32=1"
+editable = true
+
+[[messages.fields]]
+name = "距离"
+type = "f32=1000"
+editable = true
+
+[[messages.fields]]
+name = "方位"
+type = "f32=rand(0,90)"
+editable = true
+
+[[messages.fields]]
+name = "经度"
+type = "f32=rand(0,90)"
+editable = true
+
+[[messages.fields]]
+name = "纬度"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "阵深"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "目标深度"
+type = "f32"
+editable = true
+
+[[messages]]
+name = "报文03"
+interval = 1000
+enabled = true
+packet_count = 100
+
+[[messages.fields]]
+name = "通用包头"
+type = "hex_22"
+editable = false
+
+[[messages.fields]]
+name = "命令码"
+type = "i16=8001"
+editable = true
+
+[[messages.fields]]
+name = "ms"
+type = "i32=11"
+editable = true
+
+[[messages.fields]]
+name = "fms"
+type = "i32=0"
+editable = true
+
+[[messages.fields]]
+name = "fxh"
+type = "i32=1"
+editable = true
+
+[[messages.fields]]
+name = "声源级"
+type = "f32=215"
+editable = true
+
+[[messages.fields]]
+name = "海深"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "脉宽"
+type = "f32=4"
+editable = true
+
+[[messages.fields]]
+name = "目标距离"
+type = "f32"
+editable = true
+
+[[messages.fields]]
+name = "航速"
+type = "f32=4"
+editable = true

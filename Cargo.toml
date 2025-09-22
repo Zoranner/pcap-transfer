@@ -1,14 +1,16 @@
 [package]
-name = "pcap-transfer"
-version = "0.1.4"
+name = "param-sender"
+version = "0.1.5"
 edition = "2021"
 authors = ["KimoTech"]
 description = "高性能数据包传输测试工具"
+license = "MIT"
+repository = "https://github.com/KimoTech/param-sender"
+keywords = ["network", "testing", "pcap", "udp", "gui"]
+categories = ["network-programming", "development-tools::testing"]
+readme = "README.md"
 
 [dependencies]
-# 数据包读写
-pcapfile-io = { version = "0.1.2" }
-
 # 网络编程
 tokio = { version = "1.0", features = ["full"] }
 socket2 = "0.5"
@@ -46,10 +48,27 @@ rfd = "0.14" # 文件对话框
 [features]
 default = []
 
+# 开发时的额外依赖
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Lint配置
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+dead_code = "warn"
+
 [lib]
-name = "pcap_transfer"
+name = "param_sender"
 path = "src/lib.rs"
 
 [[bin]]
-name = "pcap-transfer"
+name = "param-sender"
 path = "src/main.rs"

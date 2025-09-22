@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::Path;
 
 /// 验证IP地址格式
 pub fn validate_ip_address(
@@ -17,48 +16,6 @@ pub fn validate_port(port: u16) -> Result<u16> {
         anyhow::bail!("Port number cannot be 0");
     }
     Ok(port)
-}
-
-/// 检查数据集路径是否存在
-pub fn validate_pcap_path(path: &Path) -> Result<()> {
-    if !path.exists() {
-        anyhow::bail!(
-            "PCAP Path does not exist: {}",
-            path.display()
-        );
-    }
-
-    if !path.is_dir() {
-        anyhow::bail!(
-            "PCAP Path must be a directory: {}",
-            path.display()
-        );
-    }
-
-    Ok(())
-}
-
-/// 创建输出目录（如果不存在）
-pub fn ensure_output_directory(path: &Path) -> Result<()> {
-    if !path.exists() {
-        std::fs::create_dir_all(path).with_context(
-            || {
-                format!(
-                    "Failed to create output directory: {}",
-                    path.display()
-                )
-            },
-        )?;
-    }
-
-    if !path.is_dir() {
-        anyhow::bail!(
-            "Output path must be a directory: {}",
-            path.display()
-        );
-    }
-
-    Ok(())
 }
 
 /// 判断IP地址是否为广播地址

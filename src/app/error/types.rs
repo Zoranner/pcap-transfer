@@ -1,3 +1,7 @@
+//! 应用程序错误类型定义
+//!
+//! 提供统一的错误类型系统，支持错误链和上下文信息
+
 use std::io;
 use std::net::AddrParseError;
 use thiserror::Error;
@@ -11,23 +15,35 @@ pub enum DataTransferError {
 
     /// 配置错误
     #[error("Configuration error: {message}")]
-    Config { message: String },
+    Config {
+        /// 错误消息
+        message: String,
+    },
 
     /// IP地址解析错误
     #[error("Invalid IP address format: {0}")]
     IpAddress(#[from] AddrParseError),
 
-    /// pcapfile-io 库错误
-    #[error("PCAP file processing error: {0}")]
-    PcapIo(#[from] pcapfile_io::PcapError),
-
     /// 验证错误
     #[error("Validation failed: {field} - {message}")]
-    Validation { field: String, message: String },
+    Validation {
+        /// 验证失败的字段名
+        field: String,
+        /// 错误消息
+        message: String,
+    },
 
     /// GUI 相关错误
     #[error("GUI error: {0}")]
     Gui(String),
+
+    /// 序列化错误
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] toml::de::Error),
+
+    /// 序列化错误（写入）
+    #[error("Serialization write error: {0}")]
+    SerializationWrite(#[from] toml::ser::Error),
 }
 
 impl From<anyhow::Error> for DataTransferError {
@@ -74,4 +90,5 @@ impl DataTransferError {
 /// 结果类型别名
 pub type Result<T> =
     std::result::Result<T, DataTransferError>;
+/// 应用程序错误类型别名
 pub type AppError = DataTransferError;

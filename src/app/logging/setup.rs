@@ -8,9 +8,9 @@ pub fn init_logging() {
         .unwrap_or_else(|_| {
             // 默认日志级别：debug模式下显示debug信息，release模式下显示info信息
             if cfg!(debug_assertions) {
-                EnvFilter::new("pcap_transfer=debug,warn")
+                EnvFilter::new("param_sender=debug,warn")
             } else {
-                EnvFilter::new("pcap_transfer=info,warn")
+                EnvFilter::new("param_sender=info,warn")
             }
         });
 

@@ -1,37 +1,30 @@
-//! 跨平台配置路径管理模块
-//! 负责处理不同操作系统下的配置文件路径
+//! 配置路径管理模块
+//! 负责处理程序根目录下的配置文件路径
 
-use anyhow::{Context, Result};
+use crate::app::error::types::{DataTransferError, Result};
 use std::path::{Path, PathBuf};
 
 /// 配置路径管理器
 pub struct ConfigPaths {
-    config_dir: PathBuf,
     config_file: PathBuf,
 }
 
 impl ConfigPaths {
     /// 创建新的配置路径管理器
     ///
-    /// # 参数
-    /// * `project_name` - 项目名称，将作为子目录名
-    ///
     /// # 返回
     /// 返回配置路径管理器实例
     ///
     /// # 示例
     /// ```
-    /// use pcap_transfer::app::config::paths::ConfigPaths;
-    /// let paths = ConfigPaths::new("pcap-transfer").unwrap();
+    /// use param_sender::app::config::paths::ConfigPaths;
+    /// let paths = ConfigPaths::new().unwrap();
     /// assert!(paths.config_file().to_string_lossy().contains("config.toml"));
     /// ```
-    pub fn new(project_name: &str) -> Result<Self> {
-        let config_dir =
-            Self::get_config_directory(project_name)?;
-        let config_file = config_dir.join("config.toml");
+    pub fn new() -> Result<Self> {
+        let config_file = Self::get_root_config_file()?;
 
         Ok(Self {
-            config_dir,
             config_file,
         })
     }
@@ -41,66 +34,33 @@ impl ConfigPaths {
         &self.config_file
     }
 
-    /// 确保配置目录存在
-    pub fn ensure_config_dir_exists(&self) -> Result<()> {
-        if !self.config_dir.exists() {
-            std::fs::create_dir_all(&self.config_dir)
-                .with_context(|| {
-                    format!(
-                        "Failed to create config directory: {:?}",
-                        self.config_dir
-                    )
-                })?;
-
-            tracing::info!(
-                "Created config directory: {:?}",
-                self.config_dir
-            );
-        }
-        Ok(())
-    }
-
-    /// 获取跨平台的配置目录路径
+    /// 获取程序根目录的配置文件路径
     ///
-    /// # 平台特定行为
-    /// * **Windows**: `%APPDATA%\KimoTech\[project_name]`
-    /// * **macOS**: `~/Library/Application Support/KimoTech/[project_name]`
-    /// * **Linux**: `~/.config/KimoTech/[project_name]`
-    /// * **其他**: `~/.config/KimoTech/[project_name]` (与 Linux 相同)
-    fn get_config_directory(
-        project_name: &str,
-    ) -> Result<PathBuf> {
-        let base_dir = dirs::config_dir()
-            .or_else(|| {
-                dirs::home_dir()
-                    .map(|home| home.join(".config"))
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!("Unable to determine user config directory")
-            })?;
-
-        // 构建完整的配置目录路径
-        let config_dir = match std::env::consts::OS {
-            "windows" => {
-                // Windows: %APPDATA%\KimoTech\[project_name]
-                base_dir.join("KimoTech").join(project_name)
+    /// # 返回
+    /// 返回程序根目录下的 config.toml 文件路径
+    fn get_root_config_file() -> Result<PathBuf> {
+        // 首先尝试从当前工作目录查找
+        let current_dir = std::env::current_dir()
+            .map_err(|e| DataTransferError::config(
+                format!("Failed to get current directory: {}", e)
+            ))?;
+        
+        let config_file = current_dir.join("config.toml");
+        
+        // 如果工作目录没有，尝试从可执行文件目录查找
+        if !config_file.exists() {
+            if let Ok(exe_path) = std::env::current_exe() {
+                if let Some(exe_dir) = exe_path.parent() {
+                    let exe_config_file = exe_dir.join("config.toml");
+                    if exe_config_file.exists() {
+                        tracing::info!("Found config file in executable directory: {:?}", exe_config_file);
+                        return Ok(exe_config_file);
+                    }
+                }
             }
-            "macos" => {
-                // macOS: ~/Library/Application Support/KimoTech/[project_name]
-                base_dir.join("KimoTech").join(project_name)
-            }
-            _ => {
-                // Linux 和其他平台: ~/.config/KimoTech/[project_name]
-                base_dir.join("KimoTech").join(project_name)
-            }
-        };
-
-        tracing::info!(
-            "Config directory path: {:?} (platform: {})",
-            config_dir,
-            std::env::consts::OS
-        );
-
-        Ok(config_dir)
+        }
+        
+        tracing::info!("Using config file path: {:?}", config_file);
+        Ok(config_file)
     }
 }

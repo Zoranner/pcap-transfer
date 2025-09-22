@@ -1,3 +1,3 @@
 //! 自定义控件模块
 
-pub mod status;
+// 删除了不需要的status组件

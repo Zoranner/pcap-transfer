@@ -1,45 +1,44 @@
 //! 配置管理模块
 //! 负责加载、保存和管理应用程序配置
 
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use tracing;
+
+use crate::app::error::types::{DataTransferError, Result};
 
 use super::paths::ConfigPaths;
-use super::types::{DataFormat, NetworkType};
+use super::types::NetworkType;
 
 /// 应用程序配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
+    /// 发送器配置
     pub sender: SenderConfig,
-    pub receiver: ReceiverConfig,
+    /// 消息定义列表
+    pub messages:
+        Vec<super::message_types::MessageDefinition>,
 }
 
 /// 网络配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
+    /// 目标地址
     pub address: String,
+    /// 目标端口
     pub port: u16,
-    pub network_type: String, // 在TOML中存储为字符串
+    /// 网络类型
+    pub network_type: String,
+    /// 网络接口
     pub interface: String,
 }
 
 /// 发送器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SenderConfig {
-    pub data_format: String, // 数据格式：pcap 或 csv
-    pub dataset_path: String, // PCAP数据集路径（文件夹）
-    pub csv_file: String,    // CSV文件路径（文件）
-    pub csv_packet_interval: u64, // CSV发送周期（毫秒）
-    pub network: NetworkConfig,
-}
-
-/// 接收器配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReceiverConfig {
-    pub output_path: String,
-    pub dataset_name: String,
-    pub buffer_size: usize,
+    /// 发送策略：sequential 或 parallel
+    pub strategy: String,
+    /// 网络配置
     pub network: NetworkConfig,
 }
 
@@ -57,21 +56,7 @@ impl Default for NetworkConfig {
 impl Default for SenderConfig {
     fn default() -> Self {
         Self {
-            data_format: "pcap".to_string(), // 默认使用PCAP格式
-            dataset_path: "./dataset".to_string(),
-            csv_file: String::new(), // CSV文件路径默认为空
-            csv_packet_interval: 1000, // 默认1秒发送周期
-            network: NetworkConfig::default(),
-        }
-    }
-}
-
-impl Default for ReceiverConfig {
-    fn default() -> Self {
-        Self {
-            output_path: "./output".to_string(),
-            dataset_name: "received_data".to_string(),
-            buffer_size: 1048576,
+            strategy: "sequential".to_string(),
             network: NetworkConfig::default(),
         }
     }
@@ -85,83 +70,91 @@ pub struct ConfigManager {
 
 impl ConfigManager {
     /// 创建新的配置管理器
-    ///
-    /// # 参数
-    /// * `project_name` - 项目名称，用于构建配置目录路径
-    ///
-    /// # 返回
-    /// 返回配置管理器实例，如果路径创建失败则返回错误
-    ///
-    /// # 示例
-    /// ```
-    /// use pcap_transfer::app::config::manager::ConfigManager;
-    /// let config_manager = ConfigManager::new("pcap-transfer").unwrap();
-    /// assert!(config_manager.config().sender.csv_packet_interval >= 0);
-    /// ```
-    pub fn new(project_name: &str) -> Result<Self> {
-        let config_paths = ConfigPaths::new(project_name)?;
+    pub fn new() -> Result<Self> {
+        let config_paths = ConfigPaths::new()?;
+        let config = AppConfig::default();
 
         Ok(Self {
             config_paths,
-            config: AppConfig::default(),
+            config,
         })
     }
 
     /// 加载配置文件
     pub fn load(&mut self) -> Result<()> {
-        // 确保配置目录存在
-        self.config_paths.ensure_config_dir_exists()?;
-
         let config_file = self.config_paths.config_file();
 
         if config_file.exists() {
             let content = fs::read_to_string(config_file)
-                .with_context(|| {
-                format!(
-                    "Failed to read config file: {:?}",
-                    config_file
-                )
+                .map_err(|e| {
+                DataTransferError::config(format!(
+                    "Failed to read config file {:?}: {}",
+                    config_file, e
+                ))
             })?;
 
-            self.config = toml::from_str(&content)
-                .with_context(|| {
-                    format!(
-                        "Failed to parse config file: {:?}",
-                        config_file
-                    )
-                })?;
+            // 添加调试输出
+            tracing::info!(
+                "Config file content:\n{}",
+                content
+            );
+
+            match toml::from_str::<AppConfig>(&content) {
+                Ok(config) => {
+                    self.config = config;
+                    tracing::info!("Successfully parsed config with {} messages", self.config.messages.len());
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "TOML parsing error: {}",
+                        e
+                    );
+                    tracing::warn!("Config file parse failed, using default config");
+                    // 解析失败时使用默认配置，但不返回错误
+                    self.config = AppConfig::default();
+                }
+            }
 
             tracing::info!(
                 "Config file loaded successfully: {:?}",
                 config_file
             );
+            tracing::info!(
+                "Loaded {} messages from config",
+                self.config.messages.len()
+            );
         } else {
             tracing::info!(
-                "Config file does not exist, using default config: {:?}",
+                "Config file does not exist, creating default config: {:?}",
                 config_file
             );
-            self.save()?; // 创建默认配置文件
+            // 使用默认配置并保存
+            self.config = AppConfig::default();
+            if let Err(e) = self.save() {
+                tracing::warn!("Failed to save default config file: {}", e);
+                // 保存失败不应该阻止程序运行
+            }
         }
         Ok(())
     }
 
     /// 保存配置文件
     pub fn save(&self) -> Result<()> {
-        // 确保配置目录存在
-        self.config_paths.ensure_config_dir_exists()?;
-
         let content = toml::to_string_pretty(&self.config)
-            .context("Failed to serialize config")?;
+            .map_err(|e| {
+                DataTransferError::config(format!(
+                    "Failed to serialize config: {}",
+                    e
+                ))
+            })?;
 
         let config_file = self.config_paths.config_file();
-        fs::write(config_file, content).with_context(
-            || {
-                format!(
-                    "Failed to write config file: {:?}",
-                    config_file
-                )
-            },
-        )?;
+        fs::write(config_file, &content).map_err(|e| {
+            DataTransferError::config(format!(
+                "Failed to write config file {:?}: {}",
+                config_file, e
+            ))
+        })?;
 
         tracing::info!(
             "Config file saved successfully: {:?}",
@@ -173,14 +166,6 @@ impl ConfigManager {
     /// 获取配置
     pub fn config(&self) -> &AppConfig {
         &self.config
-    }
-
-    /// 获取发送器数据格式
-    pub fn get_sender_data_format(&self) -> DataFormat {
-        match self.config.sender.data_format.as_str() {
-            "csv" => DataFormat::Csv,
-            _ => DataFormat::Pcap, // 默认为PCAP
-        }
     }
 
     /// 获取发送器网络类型
@@ -198,19 +183,21 @@ impl ConfigManager {
         }
     }
 
-    /// 获取接收器网络类型
-    pub fn get_receiver_network_type(&self) -> NetworkType {
-        match self
-            .config
-            .receiver
-            .network
-            .network_type
-            .as_str()
-        {
-            "broadcast" => NetworkType::Broadcast,
-            "multicast" => NetworkType::Multicast,
-            _ => NetworkType::Unicast,
-        }
+    /// 获取消息配置列表
+    pub fn get_messages(
+        &self,
+    ) -> &Vec<super::message_types::MessageDefinition> {
+        &self.config.messages
+    }
+
+    /// 更新消息配置列表
+    pub fn update_messages(
+        &mut self,
+        messages: Vec<
+            super::message_types::MessageDefinition,
+        >,
+    ) {
+        self.config.messages = messages;
     }
 
     /// 更新发送器配置（统一接口）
@@ -218,17 +205,6 @@ impl ConfigManager {
         &mut self,
         config: &crate::ui::config::SenderConfig,
     ) {
-        // 更新数据格式
-        self.update_sender_data_format(config.data_format);
-
-        // 更新路径配置
-        self.config.sender.dataset_path =
-            config.pcap_path.clone();
-        self.config.sender.csv_file =
-            config.csv_file.clone();
-        self.config.sender.csv_packet_interval =
-            config.csv_packet_interval;
-
         // 更新网络配置
         self.update_sender_network_config(
             config.address.clone(),
@@ -238,38 +214,7 @@ impl ConfigManager {
         );
     }
 
-    /// 更新接收器配置（统一接口）
-    pub fn update_receiver_config(
-        &mut self,
-        config: &crate::ui::config::ReceiverConfig,
-    ) {
-        // 更新路径配置
-        self.config.receiver.output_path =
-            config.output_path.clone();
-        self.config.receiver.dataset_name =
-            config.dataset_name.clone();
-
-        // 更新网络配置
-        self.update_receiver_network_config(
-            config.address.clone(),
-            config.port,
-            config.network_type,
-            config.interface.clone(),
-        );
-    }
-
-    /// 更新发送器数据格式（私有方法）
-    fn update_sender_data_format(
-        &mut self,
-        data_format: DataFormat,
-    ) {
-        self.config.sender.data_format = match data_format {
-            DataFormat::Pcap => "pcap".to_string(),
-            DataFormat::Csv => "csv".to_string(),
-        };
-    }
-
-    /// 更新发送器网络配置（私有方法）
+    /// 更新发送器网络配置（内部方法）
     fn update_sender_network_config(
         &mut self,
         address: String,
@@ -284,40 +229,15 @@ impl ConfigManager {
                 NetworkType::Unicast => {
                     "unicast".to_string()
                 }
-                NetworkType::Broadcast => {
-                    "broadcast".to_string()
-                }
                 NetworkType::Multicast => {
                     "multicast".to_string()
                 }
+                NetworkType::Broadcast => {
+                    "broadcast".to_string()
+                }
             };
-        self.config.sender.network.interface =
-            interface.unwrap_or_default();
-    }
 
-    /// 更新接收器网络配置（私有方法）
-    fn update_receiver_network_config(
-        &mut self,
-        address: String,
-        port: u16,
-        network_type: NetworkType,
-        interface: Option<String>,
-    ) {
-        self.config.receiver.network.address = address;
-        self.config.receiver.network.port = port;
-        self.config.receiver.network.network_type =
-            match network_type {
-                NetworkType::Unicast => {
-                    "unicast".to_string()
-                }
-                NetworkType::Broadcast => {
-                    "broadcast".to_string()
-                }
-                NetworkType::Multicast => {
-                    "multicast".to_string()
-                }
-            };
-        self.config.receiver.network.interface =
+        self.config.sender.network.interface =
             interface.unwrap_or_default();
     }
 }
