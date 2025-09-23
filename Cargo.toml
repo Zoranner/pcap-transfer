@@ -1,6 +1,6 @@
 [package]
 name = "param-sender"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["KimoTech"]
 description = "高性能数据包传输测试工具"
