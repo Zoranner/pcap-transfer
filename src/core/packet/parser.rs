@@ -146,21 +146,21 @@ impl PacketParser {
             }
             FieldDataType::F32 => {
                 if bytes.len() >= 4 {
-                    format!("{:.6}", f32::from_le_bytes([
+                    format!("{:.1}", f32::from_le_bytes([
                         bytes[0], bytes[1], bytes[2], bytes[3]
                     ]))
                 } else {
-                    "0.000000".to_string()
+                    "0.0".to_string()
                 }
             }
             FieldDataType::F64 => {
                 if bytes.len() >= 8 {
-                    format!("{:.6}", f64::from_le_bytes([
+                    format!("{:.1}", f64::from_le_bytes([
                         bytes[0], bytes[1], bytes[2], bytes[3],
                         bytes[4], bytes[5], bytes[6], bytes[7]
                     ]))
                 } else {
-                    "0.000000".to_string()
+                    "0.0".to_string()
                 }
             }
             FieldDataType::Bool => {
