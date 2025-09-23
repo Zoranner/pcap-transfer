@@ -201,6 +201,27 @@ impl TransferService {
 
             let now = std::time::Instant::now();
 
+            // 检查是否所有设置了包数量限制的消息都已完成（自动停止条件）
+            let messages_with_limit: Vec<_> = runtime_messages
+                .iter()
+                .enumerate()
+                .filter(|(_, runtime_msg)| runtime_msg.definition.packet_count > 0)
+                .collect();
+            
+            let all_limited_messages_complete = if messages_with_limit.is_empty() {
+                false // 如果没有消息设置了限制，则不自动停止
+            } else {
+                messages_with_limit.iter().all(|(i, runtime_msg)| {
+                    packet_counters[*i] >= runtime_msg.definition.packet_count
+                })
+            };
+
+            // 如果所有设置了包数量限制的消息都完成了，自动停止
+            if all_limited_messages_complete {
+                tracing::info!("All messages with packet count limits have completed, stopping automatically");
+                break;
+            }
+
             // 检查每个消息是否需要发送
             for (i, runtime_msg) in
                 runtime_messages.iter_mut().enumerate()

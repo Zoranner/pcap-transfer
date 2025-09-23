@@ -131,6 +131,7 @@ impl MessageStats {
 pub struct MessageStatsManager {
     message_stats: HashMap<String, MessageStats>,
     global_start_time: Option<Instant>,
+    global_end_time: Option<Instant>,
 }
 
 impl Default for MessageStatsManager {
@@ -145,6 +146,7 @@ impl MessageStatsManager {
         Self {
             message_stats: HashMap::new(),
             global_start_time: Some(Instant::now()),
+            global_end_time: None,
         }
     }
 
@@ -188,6 +190,9 @@ impl MessageStatsManager {
 
     /// 结束所有消息的统计
     pub fn finish_all(&mut self) {
+        if self.global_end_time.is_none() {
+            self.global_end_time = Some(Instant::now());
+        }
         for stats in self.message_stats.values_mut() {
             stats.finish();
         }
@@ -219,9 +224,17 @@ impl MessageStatsManager {
             .sum();
         let message_count = self.message_stats.len();
 
-        let global_duration = self
-            .global_start_time
-            .map(|start| start.elapsed());
+        let global_duration = if let Some(start) = self.global_start_time {
+            if let Some(end) = self.global_end_time {
+                // 如果已结束，使用结束时间
+                Some(end.duration_since(start))
+            } else {
+                // 如果还在运行，使用当前时间
+                Some(start.elapsed())
+            }
+        } else {
+            None
+        };
 
         let global_packet_rate = if let Some(duration) =
             global_duration
@@ -266,6 +279,7 @@ impl MessageStatsManager {
     pub fn reset(&mut self) {
         self.message_stats.clear();
         self.global_start_time = Some(Instant::now());
+        self.global_end_time = None;
     }
 }
 
