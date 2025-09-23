@@ -11,6 +11,7 @@ use crate::app::config::manager::ConfigManager;
 use crate::app::config::types::SenderAppConfig;
 use crate::app::error::types::Result;
 use crate::core::network::TransferState;
+use crate::core::packet::PacketParser;
 use crate::core::stats::collector::TransferStats;
 use crate::core::stats::message_stats::MessageStatsManager;
 use crate::ui::config::SenderConfig;
@@ -271,6 +272,14 @@ impl TransferService {
                                         packet_data.len(),
                                         target_addr
                                     );
+
+                                    // 解析并打印包内容
+                                    let parsed_content = PacketParser::parse_and_format_packet(
+                                        runtime_msg,
+                                        &packet_data,
+                                        packet_counters[i]
+                                    );
+                                    tracing::debug!("{}", parsed_content);
                                 }
                                 Err(e) => {
                                     // 记录发送错误
