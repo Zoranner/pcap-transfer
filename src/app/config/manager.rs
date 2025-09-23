@@ -163,6 +163,64 @@ impl ConfigManager {
         Ok(())
     }
 
+    /// 只保存网络配置，不影响报文配置
+    pub fn save_network_only(&self) -> Result<()> {
+        let config_file = self.config_paths.config_file();
+        
+        // 读取现有的配置文件内容
+        let mut file_config = if config_file.exists() {
+            let content = fs::read_to_string(config_file)
+                .map_err(|e| {
+                    DataTransferError::config(format!(
+                        "Failed to read existing config file {:?}: {}",
+                        config_file, e
+                    ))
+                })?;
+            
+            // 解析现有配置
+            toml::from_str::<AppConfig>(&content)
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Failed to parse existing config, using current messages: {}", e);
+                    // 如果解析失败，使用当前的消息配置作为备份
+                    AppConfig {
+                        sender: SenderConfig::default(),
+                        messages: self.config.messages.clone(),
+                    }
+                })
+        } else {
+            // 如果文件不存在，使用当前的消息配置
+            AppConfig {
+                sender: SenderConfig::default(),
+                messages: self.config.messages.clone(),
+            }
+        };
+        
+        // 只更新网络配置部分，保持报文配置不变
+        file_config.sender = self.config.sender.clone();
+        
+        // 序列化并保存
+        let content = toml::to_string_pretty(&file_config)
+            .map_err(|e| {
+                DataTransferError::config(format!(
+                    "Failed to serialize network config: {}",
+                    e
+                ))
+            })?;
+        
+        fs::write(config_file, &content).map_err(|e| {
+            DataTransferError::config(format!(
+                "Failed to write network config to file {:?}: {}",
+                config_file, e
+            ))
+        })?;
+        
+        tracing::info!(
+            "Network configuration saved successfully: {:?}",
+            config_file
+        );
+        Ok(())
+    }
+
     /// 获取配置
     pub fn config(&self) -> &AppConfig {
         &self.config

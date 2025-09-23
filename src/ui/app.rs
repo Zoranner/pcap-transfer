@@ -295,12 +295,9 @@ impl DataTransferApp {
             .update_messages(updated_messages);
     }
 
-    /// 保存当前GUI配置到配置管理器
-    fn save_current_config(&mut self) {
-        // 先同步字段值
-        self.sync_field_values_to_config();
-
-        // 保存全局网络配置到发送器配置
+    /// 只保存网络配置（应用退出时使用）
+    fn save_network_config_only(&mut self) {
+        // 只保存全局网络配置到发送器配置，不同步报文配置
         let sender_config = SenderConfig {
             address: self
                 .message_config
@@ -322,14 +319,14 @@ impl DataTransferApp {
             .config_manager
             .update_sender_config(&sender_config);
 
-        // 保存到文件
+        // 只保存网络配置到文件，不覆盖报文配置
         if let Err(e) =
-            self.transfer_service.config_manager.save()
+            self.transfer_service.config_manager.save_network_only()
         {
-            tracing::error!("Failed to save config: {}", e);
+            tracing::error!("Failed to save network config: {}", e);
         } else {
             tracing::info!(
-                "Configuration saved successfully"
+                "Network configuration saved successfully (messages preserved)"
             );
         }
     }
@@ -479,18 +476,8 @@ impl eframe::App for DataTransferApp {
         &mut self,
         _gl: Option<&eframe::glow::Context>,
     ) {
-        // 应用退出时保存当前配置
-        self.save_current_config();
-
-        // 保存到配置文件
-        if let Err(e) =
-            self.transfer_service.config_manager.save()
-        {
-            tracing::error!(
-                "Failed to save config file: {}",
-                e
-            );
-        }
+        // 应用退出时只保存网络配置，不保存报文配置
+        self.save_network_config_only();
     }
 }
 
