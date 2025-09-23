@@ -11,7 +11,7 @@ interface = ""
 name = "报文01"
 interval = 1000
 enabled = true
-packet_count = 100
+packet_count = 50
 
 [[messages.fields]]
 name = "通用包头"
@@ -20,7 +20,7 @@ editable = false
 
 [[messages.fields]]
 name = "命令码"
-type = "i16=8001"
+type = "hex=8001"
 editable = true
 
 [[messages.fields]]
@@ -30,22 +30,22 @@ editable = true
 
 [[messages.fields]]
 name = "估计距离"
-type = "f32"
+type = "f32=rand(20,30)"
 editable = true
 
 [[messages.fields]]
 name = "实际角度"
-type = "f32"
+type = "f32=rand(0,90)"
 editable = true
 
 [[messages.fields]]
 name = "估计角度"
-type = "f32"
+type = "f32=rand(0,90)"
 editable = true
 
 [[messages.fields]]
 name = "真实距离"
-type = "f32"
+type = "f32=rand(200,300)"
 editable = true
 
 [[messages.fields]]
@@ -60,7 +60,7 @@ editable = true
 
 [[messages.fields]]
 name = "程序启动/停止"
-type = "i32=switch(0,-2:1)"
+type = "i32=switch(1,-2:0,-1:0)"
 editable = true
 
 [[messages.fields]]
@@ -82,7 +82,7 @@ editable = true
 name = "报文02"
 interval = 1000
 enabled = true
-packet_count = 100
+packet_count = 50
 
 [[messages.fields]]
 name = "通用包头"
@@ -91,7 +91,7 @@ editable = false
 
 [[messages.fields]]
 name = "命令码"
-type = "i16=8001"
+type = "hex=8001"
 editable = true
 
 [[messages.fields]]
@@ -121,29 +121,29 @@ editable = true
 
 [[messages.fields]]
 name = "经度"
-type = "f32=rand(0,90)"
+type = "f32=rand(120,122)"
 editable = true
 
 [[messages.fields]]
 name = "纬度"
-type = "f32"
+type = "f32=rand(56,62)"
 editable = true
 
 [[messages.fields]]
 name = "阵深"
-type = "f32"
+type = "f32=rand(200,300)"
 editable = true
 
 [[messages.fields]]
 name = "目标深度"
-type = "f32"
+type = "f32=rand(20.0,30.0)"
 editable = true
 
 [[messages]]
 name = "报文03"
 interval = 1000
 enabled = true
-packet_count = 100
+packet_count = 50
 
 [[messages.fields]]
 name = "通用包头"
@@ -152,7 +152,7 @@ editable = false
 
 [[messages.fields]]
 name = "命令码"
-type = "i16=8001"
+type = "hex=8001"
 editable = true
 
 [[messages.fields]]
@@ -177,7 +177,12 @@ editable = true
 
 [[messages.fields]]
 name = "海深"
-type = "f32"
+type = "f32=rand(100,300)"
+editable = true
+
+[[messages.fields]]
+name = "目标深度"
+type = "f32=rand(20,30)"
 editable = true
 
 [[messages.fields]]
@@ -187,7 +192,7 @@ editable = true
 
 [[messages.fields]]
 name = "目标距离"
-type = "f32"
+type = "f32=rand(200,300)"
 editable = true
 
 [[messages.fields]]
